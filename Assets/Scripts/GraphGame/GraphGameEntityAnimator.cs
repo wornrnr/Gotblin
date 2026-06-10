@@ -4,8 +4,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 소셜 그래프 미니게임 진행 상태에 연동하여 고블린의 좌우 왕복/탈출 연출 및
-/// 드래곤의 상태별 이미지(잠자기/공격) 스위칭을 제어하는 비주얼 연출 매니저입니다.
-/// 달리는 상태일 때 프로그램적으로 6프레임 플립북 스프라이트 애니메이션을 재생합니다.
+/// 드래곤의 상태별 다중 프레임 플립북 애니메이션(잠자기/공격)을 제어하는 비주얼 연출 매니저입니다.
 /// </summary>
 [DisallowMultipleComponent]
 public class GraphGameEntityAnimator : MonoBehaviour
@@ -23,12 +22,15 @@ public class GraphGameEntityAnimator : MonoBehaviour
     [Tooltip("이미지 스위칭을 연출할 드래곤 이미지 컴포넌트입니다.")]
     [SerializeField] private Image dragonImage;
 
-    [Header("Dragon Sprites")]
-    [Tooltip("Ready 및 평상시 자고 있는 드래곤 이미지입니다.")]
-    [SerializeField] private Sprite dragonSleepingSprite;
+    [Header("Dragon Sprite Sheets")]
+    [Tooltip("Ready 및 평상시 자고 있는 드래곤의 애니메이션 스프라이트 배열입니다.")]
+    public Sprite[] dragonSleepingSprites;
 
-    [Tooltip("Busted 발각 시 브레스를 뿜는 드래곤 이미지입니다.")]
-    [SerializeField] private Sprite dragonAttackSprite;
+    [Tooltip("Busted 발각 시 브레스를 뿜는 드래곤의 애니메이션 스프라이트 배열입니다.")]
+    public Sprite[] dragonAttackSprites;
+
+    [Tooltip("드래곤 애니메이션의 초당 프레임 수(FPS)입니다.")]
+    public float dragonAnimationFPS = 6f;
 
     [Header("Goblin Settings")]
     [Tooltip("Running 진행 시 고블린의 실시간 좌우 질주 속도입니다.")]
@@ -41,26 +43,31 @@ public class GraphGameEntityAnimator : MonoBehaviour
     [Tooltip("고블린이 달릴 때 재생할 스프라이트 시트 배열입니다.")]
     public Sprite[] goblinRunSprites;
 
-    [Tooltip("초당 재생할 스프라이트 프레임 수(FPS)입니다.")]
-    public float animationFPS = 12f;
+    [Tooltip("고블린 애니메이션의 초당 재생할 스프라이트 프레임 수(FPS)입니다.")]
+    public float goblinAnimationFPS = 12f;
 
-    // 실시간 상태 관리 변수군
+    // 고블린 실시간 상태 관리 변수군
     private bool isRunningAnimation = false;
     private float currentDirection = 1f; // 1: 오른쪽 이동, -1: 왼쪽 이동
     private float baseGoblinScaleX = 1f;   // 인스펙터에 설정된 고블린의 기본 X 스케일 크기 보존용
     
-    // 프레임 애니메이션용 제어 변수군
-    private int currentFrameIndex = 0;
-    private float frameTimer = 0f;
+    // 고블린 프레임 애니메이션용 제어 변수군
+    private int currentGoblinFrameIndex = 0;
+    private float goblinFrameTimer = 0f;
+
+    // 드래곤 프레임 애니메이션용 제어 변수군
+    private Sprite[] currentDragonSprites;
+    private int currentDragonFrameIndex = 0;
+    private float dragonFrameTimer = 0f;
 
     private Coroutine currentActiveCoroutine;
 
     private void Start()
     {
         // 1. 방어적 예외 검증
-        if (centerPanel == null || goblinTransform == null || goblinImage == null)
+        if (centerPanel == null || goblinTransform == null || goblinImage == null || dragonImage == null)
         {
-            Debug.LogError("[GraphGameEntityAnimator] centerPanel, goblinTransform 또는 goblinImage 레퍼런스가 누락되었습니다!");
+            Debug.LogError("[GraphGameEntityAnimator] centerPanel, goblinTransform, goblinImage 또는 dragonImage 레퍼런스가 누락되었습니다!");
             enabled = false;
             return;
         }
@@ -90,7 +97,10 @@ public class GraphGameEntityAnimator : MonoBehaviour
 
     private void Update()
     {
-        // Running 상태일 때만 고블린이 가로 배너 패널 내에서 실시간 좌우 왕복 이동을 수행합니다.
+        // 1. 드래곤의 애니메이션은 대기/공격에 상관없이 항상 프레임이 순환 재생되어야 합니다.
+        UpdateDragonAnimation();
+
+        // 2. Running 상태일 때만 고블린이 실시간 좌우 왕복 이동 및 달리기 애니메이션을 수행합니다.
         if (isRunningAnimation)
         {
             UpdateGoblinPatrol();
@@ -127,15 +137,15 @@ public class GraphGameEntityAnimator : MonoBehaviour
     }
 
     /// <summary>
-    /// Ready 진입 시: 고블린 위치 리셋 및 스프라이트 1프레임 초기화
+    /// Ready 진입 시: 고블린 위치 리셋, 고블린 스프라이트 1프레임 초기화 및 드래곤 잠자기 애니메이션 셋업
     /// </summary>
     private void SetupReadyState()
     {
         isRunningAnimation = false;
 
-        // 애니메이션 프레임 제어 인덱스 리셋
-        currentFrameIndex = 0;
-        frameTimer = 0f;
+        // 고블린 애니메이션 프레임 제어 인덱스 리셋
+        currentGoblinFrameIndex = 0;
+        goblinFrameTimer = 0f;
 
         if (goblinTransform != null)
         {
@@ -154,8 +164,8 @@ public class GraphGameEntityAnimator : MonoBehaviour
             goblinImage.sprite = goblinRunSprites[0];
         }
 
-        // 드래곤 평화 상태 스프라이트 할당
-        SetDragonSprite(dragonSleepingSprite);
+        // 드래곤 잠자기 애니메이션 프레임 등록
+        SetDragonAnimationState(dragonSleepingSprites);
     }
 
     /// <summary>
@@ -167,13 +177,17 @@ public class GraphGameEntityAnimator : MonoBehaviour
         currentDirection = 1f;
         SetGoblinFacing(currentDirection);
 
-        currentFrameIndex = 0;
-        frameTimer = 0f;
+        currentGoblinFrameIndex = 0;
+        goblinFrameTimer = 0f;
 
         // Update 연산 가동 허용
         isRunningAnimation = true;
 
-        SetDragonSprite(dragonSleepingSprite);
+        // 드래곤은 계속 잠자고 있는 상태를 유지
+        if (currentDragonSprites != dragonSleepingSprites)
+        {
+            SetDragonAnimationState(dragonSleepingSprites);
+        }
     }
 
     /// <summary>
@@ -186,19 +200,22 @@ public class GraphGameEntityAnimator : MonoBehaviour
         // 탈출 연출 코루틴 구동
         currentActiveCoroutine = StartCoroutine(SuccessEscapeCoroutine());
         
-        SetDragonSprite(dragonSleepingSprite);
+        // 드래곤은 성공 시점까지도 계속 자고 있음
+        if (currentDragonSprites != dragonSleepingSprites)
+        {
+            SetDragonAnimationState(dragonSleepingSprites);
+        }
     }
 
     /// <summary>
-    /// Busted 진입 시: 그 즉시 동작을 정지시키고 자고 있던 드래곤을 공격 브레스 상태로 즉각 갱신
-    /// (고블린 프레임은 그 자리에 즉시 정지 상태로 고정)
+    /// Busted 진입 시: 그 즉시 동작을 정지시키고 드래곤을 브레스/공격 애니메이션으로 즉각 갱신
     /// </summary>
     private void SetupBustedState()
     {
         isRunningAnimation = false;
 
-        // 드래곤 분노 브레스 스프라이트 갱신 시뮬레이션
-        SetDragonSprite(dragonAttackSprite);
+        // 드래곤 공격 분노 애니메이션 리스트 등록
+        SetDragonAnimationState(dragonAttackSprites);
     }
 
     /// <summary>
@@ -239,28 +256,67 @@ public class GraphGameEntityAnimator : MonoBehaviour
     /// </summary>
     private void UpdateGoblinAnimation()
     {
-        // [코딩 제약 조건] 기획자가 스프라이트를 할당하지 않았을 시 널 레퍼런스 에러 방지
+        // 기획자가 고블린 스프라이트를 할당하지 않았을 시 방어 처리
         if (goblinRunSprites == null || goblinRunSprites.Length == 0 || goblinImage == null)
         {
             return;
         }
 
-        // FPS 수치가 0 이하인 비정상 오류 시 연산 중단 방어
-        if (animationFPS <= 0f) return;
+        if (goblinAnimationFPS <= 0f) return;
 
-        frameTimer += Time.deltaTime;
-        float timePerFrame = 1f / animationFPS;
+        goblinFrameTimer += Time.deltaTime;
+        float timePerFrame = 1f / goblinAnimationFPS;
 
-        if (frameTimer >= timePerFrame)
+        if (goblinFrameTimer >= timePerFrame)
         {
-            // 누적 잔여 오차 프레임을 보존하여 주기를 균일하게 최적화하는 감산 처리
-            frameTimer -= timePerFrame;
+            goblinFrameTimer -= timePerFrame;
             
             // 다음 프레임 번호 연산 (순환 구조)
-            currentFrameIndex = (currentFrameIndex + 1) % goblinRunSprites.Length;
+            currentGoblinFrameIndex = (currentGoblinFrameIndex + 1) % goblinRunSprites.Length;
+            goblinImage.sprite = goblinRunSprites[currentGoblinFrameIndex];
+        }
+    }
+
+    /// <summary>
+    /// 지정된 드래곤 스프라이트 세트를 애니메이션 타깃으로 활성화하고 프레임을 즉시 0번째로 리셋합니다.
+    /// </summary>
+    private void SetDragonAnimationState(Sprite[] sprites)
+    {
+        currentDragonSprites = sprites;
+        currentDragonFrameIndex = 0;
+        dragonFrameTimer = 0f;
+
+        // 상태 전환 직후 즉각 1프레임을 그려 지연 감각을 제거
+        if (dragonImage != null && currentDragonSprites != null && currentDragonSprites.Length > 0)
+        {
+            dragonImage.sprite = currentDragonSprites[0];
+        }
+    }
+
+    /// <summary>
+    /// C# 기반의 프레임 타이머 연산을 가동하여 드래곤의 상태별 애니메이션(수면/공격)을 실시간 루핑 재생합니다.
+    /// </summary>
+    private void UpdateDragonAnimation()
+    {
+        // 기획자가 드래곤 스프라이트를 할당하지 않았을 시 방어 처리
+        if (currentDragonSprites == null || currentDragonSprites.Length == 0 || dragonImage == null)
+        {
+            return;
+        }
+
+        if (dragonAnimationFPS <= 0f) return;
+
+        dragonFrameTimer += Time.deltaTime;
+        float timePerFrame = 1f / dragonAnimationFPS;
+
+        if (dragonFrameTimer >= timePerFrame)
+        {
+            // 균일한 애니메이션 프레임 재생을 위한 오차 오프셋 감산
+            dragonFrameTimer -= timePerFrame;
             
-            // 이미지 교체
-            goblinImage.sprite = goblinRunSprites[currentFrameIndex];
+            // 다음 프레임 순환 연산
+            currentDragonFrameIndex = (currentDragonFrameIndex + 1) % currentDragonSprites.Length;
+            dragonImage.sprite = currentDragonSprites[currentDragonFrameIndex];
         }
     }
 
@@ -276,17 +332,6 @@ public class GraphGameEntityAnimator : MonoBehaviour
         // X 스케일 부호를 방향 수치에 비례해 반전
         localScale.x = baseGoblinScaleX * Mathf.Sign(direction);
         goblinTransform.localScale = localScale;
-    }
-
-    /// <summary>
-    /// 드래곤의 스프라이트 리소스를 안전하게 갱신해 줍니다.
-    /// </summary>
-    private void SetDragonSprite(Sprite sprite)
-    {
-        if (dragonImage != null && sprite != null)
-        {
-            dragonImage.sprite = sprite;
-        }
     }
 
     /// <summary>

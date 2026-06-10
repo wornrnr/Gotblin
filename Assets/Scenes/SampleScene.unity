@@ -1314,8 +1314,19 @@ MonoBehaviour:
   goblinTransform: {fileID: 82900237}
   goblinImage: {fileID: 82900238}
   dragonImage: {fileID: 1334258481}
-  dragonSleepingSprite: {fileID: -2082954526221052654, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
-  dragonAttackSprite: {fileID: -2082954526221052654, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
+  dragonSleepingSprites:
+  - {fileID: 7817824236775336533, guid: 0f5bbdee433e2b04dac735144bf49bdd, type: 3}
+  - {fileID: 7394278741891550476, guid: 0f5bbdee433e2b04dac735144bf49bdd, type: 3}
+  - {fileID: -744214492379960070, guid: 0f5bbdee433e2b04dac735144bf49bdd, type: 3}
+  - {fileID: -5385023130267225266, guid: 0f5bbdee433e2b04dac735144bf49bdd, type: 3}
+  - {fileID: 873053181025813190, guid: 0f5bbdee433e2b04dac735144bf49bdd, type: 3}
+  dragonAttackSprites:
+  - {fileID: 7342464717533405095, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
+  - {fileID: 4540509086475868180, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
+  - {fileID: 5940616952626771834, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
+  - {fileID: 5296320343434208637, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
+  - {fileID: 3812555585315723054, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
+  dragonAnimationFPS: 6
   moveSpeed: 400
   margin: 50
   goblinRunSprites:
@@ -1323,7 +1334,7 @@ MonoBehaviour:
   - {fileID: -1118248676379877382, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
   - {fileID: 3658427941129966439, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
   - {fileID: -8276668373891187711, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
-  animationFPS: 12
+  goblinAnimationFPS: 12
 --- !u!1 &1151052049
 GameObject:
   m_ObjectHideFlags: 0
@@ -1591,8 +1602,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 292.16437, y: 229.09717}
-  m_SizeDelta: {x: 584.3286, y: 458.1945}
+  m_AnchoredPosition: {x: 449.74, y: 216}
+  m_SizeDelta: {x: 980.5232, y: 505.5823}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1334258481
 MonoBehaviour:
@@ -1607,7 +1618,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.5, g: 0.1957547, b: 0.1957547, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
