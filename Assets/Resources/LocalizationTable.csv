@@ -1,0 +1,9 @@
+Key,KO,EN,JA
+ui_start_btn,잠입 시작,Start Infiltration,潜入開始
+ui_cashout_btn,그만! (도망치기),Escape!,脱出！
+ui_next_btn,다음 잠입 준비,Prepare Next,次の潜入準備
+ui_busted_msg,들켰습니다! (0배),BUSTED! (0x),見つかりました！ (0倍)
+GraphGame_Desc,경비병의 눈을 피해 최대한 많은 보물을 훔쳐 탈출하세요!,Dodge the guards and steal as many treasures as you can!,警備兵の目を避けてできるだけ 많은宝物を盗んで脱출してください！
+GraphGame_Win_Desc,보물 탈취 성공!!!,Success Stealing Treasures!!!,宝物奪取成功!!!
+GraphGame_Lose_Desc,들켰다!!!,Busted!!!,見つかった!!!
+GraphGame_Count,남은 고블린 수,Goblins,残りのゴブリン数
