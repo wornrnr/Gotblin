@@ -1327,8 +1327,10 @@ MonoBehaviour:
   - {fileID: 5296320343434208637, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
   - {fileID: 3812555585315723054, guid: 514dc42d1934caf40bb8f74c43ca6459, type: 3}
   dragonAnimationFPS: 6
-  moveSpeed: 400
+  moveSpeed: 800
   margin: 50
+  patrolMinX: -1010
+  patrolMaxX: -70
   goblinRunSprites:
   - {fileID: -2082954526221052654, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
   - {fileID: -1118248676379877382, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}

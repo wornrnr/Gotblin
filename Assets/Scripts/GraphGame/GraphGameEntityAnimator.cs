@@ -5,6 +5,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 소셜 그래프 미니게임 진행 상태에 연동하여 고블린의 좌우 왕복/탈출 연출 및
 /// 드래곤의 상태별 다중 프레임 플립북 애니메이션(잠자기/공격)을 제어하는 비주얼 연출 매니저입니다.
+/// 부모 패널의 피벗(Pivot) 치우침이나 앵커 꼬임으로 인한 편향 좌표 왕복(예: -1010 ~ -70)을 완벽 수용하도록 설계되었습니다.
 /// </summary>
 [DisallowMultipleComponent]
 public class GraphGameEntityAnimator : MonoBehaviour
@@ -36,8 +37,14 @@ public class GraphGameEntityAnimator : MonoBehaviour
     [Tooltip("Running 진행 시 고블린의 실시간 좌우 질주 속도입니다.")]
     [SerializeField] private float moveSpeed = 400f;
 
-    [Tooltip("고블린이 배너 끝에 도달했을 때 멈출 안전 마진 패딩 값입니다.")]
+    [Tooltip("고블린이 배너 끝에 도달했을 때 멈출 안전 마진 패딩 값입니다. (수동 범위 입력 시 작동 안함)")]
     [SerializeField] private float margin = 50f;
+
+    [Tooltip("고블린이 왕복할 수동 가로 최소(좌측) 로컬 좌표입니다. (0으로 두면 자동 해상도 연산 적용)")]
+    [SerializeField] private float patrolMinX = 0f;
+
+    [Tooltip("고블린이 왕복할 수동 가로 최대(우측) 로컬 좌표입니다. (0으로 두면 자동 해상도 연산 적용)")]
+    [SerializeField] private float patrolMaxX = 0f;
 
     [Header("Goblin Sprite Sheet Animation")]
     [Tooltip("고블린이 달릴 때 재생할 스프라이트 시트 배열입니다.")]
@@ -151,8 +158,15 @@ public class GraphGameEntityAnimator : MonoBehaviour
         {
             goblinTransform.gameObject.SetActive(true);
             
-            // 고블린을 중앙 하단(X=0)으로 정밀 복구 초기화
-            goblinTransform.anchoredPosition = new Vector2(0f, goblinTransform.anchoredPosition.y);
+            // 수동 최소/최대 좌표 범위가 설정되어 있다면, 고블린의 대기 정지 중심점(X)을 두 범위의 정가운데로 정렬합니다.
+            float startX = 0f;
+            if (patrolMinX != 0f || patrolMaxX != 0f)
+            {
+                startX = (patrolMinX + patrolMaxX) / 2f;
+            }
+
+            // 고블린을 대기 좌표로 정밀 초기화 (Y값은 기존 디자인 수치 유지)
+            goblinTransform.anchoredPosition = new Vector2(startX, goblinTransform.anchoredPosition.y);
             
             // 고블린 바라보는 방향 리셋 (오른쪽 보기)
             SetGoblinFacing(1f);
@@ -219,14 +233,27 @@ public class GraphGameEntityAnimator : MonoBehaviour
     }
 
     /// <summary>
-    /// centerPanel.rect 해상도를 실시간 반영하여 화면 밖 이탈이 절대로 일어나지 않도록 클램핑 왕복 질주합니다.
+    /// 수동 입력 범위(MinX ~ MaxX) 혹은 실시간 해상도를 반영하여 화면 밖 이탈이 절대로 일어나지 않도록 클램핑 왕복 질주합니다.
     /// </summary>
     private void UpdateGoblinPatrol()
     {
-        // 실시간 해상도 대응을 위한 좌우 가로폭 마진 클램프 영역 연산
-        float widthHalf = centerPanel.rect.width / 2f;
-        float minX = -widthHalf + margin;
-        float maxX = widthHalf - margin;
+        float minX = 0f;
+        float maxX = 0f;
+
+        // 1. 기획자 수동 가로 좌표 범위 존재 여부에 따른 최소/최대 한계 분기 연산
+        if (patrolMinX != 0f || patrolMaxX != 0f)
+        {
+            // 부모의 피벗이 치우친 경우 수동 로컬 좌표 범위 다이렉트 적용
+            minX = patrolMinX;
+            maxX = patrolMaxX;
+        }
+        else
+        {
+            // 실시간 해상도 대응을 위한 가로폭 자동 계산 작동
+            float widthHalf = centerPanel.rect.width / 2f;
+            minX = -widthHalf + margin;
+            maxX = widthHalf - margin;
+        }
 
         Vector2 pos = goblinTransform.anchoredPosition;
 
@@ -344,8 +371,9 @@ public class GraphGameEntityAnimator : MonoBehaviour
         // 탈출할 때 고블린이 우측 방향(오른쪽)을 바라보며 도망가도록 세팅
         SetGoblinFacing(1f);
 
-        // 캔버스 가로폭 밖 한계 범위 설정 (화면 가로 절반 크기 + 이탈 여유 200픽셀 마진)
-        float escapeLimitX = (centerPanel.rect.width / 2f) + 200f;
+        // 캔버스 가로폭 밖 한계 범위 설정 (수동 범위 설정 여부에 맞추어 안전 퇴장 거리 확보)
+        float limitX = (patrolMinX != 0f || patrolMaxX != 0f) ? patrolMaxX : (centerPanel.rect.width / 2f);
+        float escapeLimitX = limitX + 200f;
 
         while (goblinTransform.anchoredPosition.x < escapeLimitX)
         {
