@@ -1167,6 +1167,57 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 803312723}
   m_CullTransparentMesh: 1
+--- !u!1 &824445096
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 824445098}
+  - component: {fileID: 824445097}
+  m_Layer: 0
+  m_Name: GoldJuiceSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &824445097
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 824445096}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bad5d061039a4644adbd2164bc00e33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  goblinTransform: {fileID: 82900237}
+  goldPrefab: {fileID: 1420227264234854830, guid: 5ac751bf520f0924682f3f692b6f403c, type: 3}
+  effectContainer: {fileID: 803312724}
+  baseSpawnInterval: 0.1
+  minSpawnInterval: 0.05
+  intensityScale: 0.02
+  spawnOffset: {x: 200, y: -200}
+--- !u!4 &824445098
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 824445096}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -94.57443, y: 1364.3008, z: -10.869438}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &915077645
 GameObject:
   m_ObjectHideFlags: 0
@@ -1383,7 +1434,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tableData: {fileID: 11400000, guid: 8e50d44919f7a074b9dfc0660f2a3224, type: 2}
   baseReward: 100
-  curveSpeed: 0.4
+  curveSpeed: 5
   currentState: 0
   currentTimer: 0
   targetStopTime: 0
@@ -1569,7 +1620,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77b0c5f4aa3b77847931117e34a50925, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gold: 900
+  gold: 0
 --- !u!1 &1334258479
 GameObject:
   m_ObjectHideFlags: 0
@@ -2430,3 +2481,4 @@ SceneRoots:
   - {fileID: 1525392597}
   - {fileID: 233979420}
   - {fileID: 794627816}
+  - {fileID: 824445098}
