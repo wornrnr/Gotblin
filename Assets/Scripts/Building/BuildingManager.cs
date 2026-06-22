@@ -317,6 +317,33 @@ public class BuildingManager : MonoBehaviour
     }
 
     // -----------------------------------------------------------------------------------
+    // 외부 조회를 위한 퍼블릭 API
+    // -----------------------------------------------------------------------------------
+    /// <summary>
+    /// 특정 건물 ID에 해당하는 기획 템플릿 스펙 데이터를 조회합니다.
+    /// </summary>
+    public BuildingData GetBuildingData(string id)
+    {
+        return FindTemplate(id);
+    }
+
+    /// <summary>
+    /// 특정 건물 ID에 해당하는 실시간 유저 인스턴스 상태를 조회합니다.
+    /// </summary>
+    public BuildingInstance GetBuildingInstance(string id)
+    {
+        return FindInstance(id);
+    }
+
+    /// <summary>
+    /// 전체 실시간 건물 인스턴스 리스트를 반환합니다.
+    /// </summary>
+    public List<BuildingInstance> GetActiveBuildings()
+    {
+        return activeBuildings;
+    }
+
+    // -----------------------------------------------------------------------------------
     // 에디터 인스펙터 테스트용 ContextMenu 디버그 기능군
     // -----------------------------------------------------------------------------------
     [ContextMenu("Slots/Unlock 2 Slots")]
