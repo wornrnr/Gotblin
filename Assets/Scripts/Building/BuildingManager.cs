@@ -159,11 +159,13 @@ public class BuildingManager : MonoBehaviour
             return;
         }
 
-        // 4. 비용 및 소요 시간 비선형 증가 공식 적용
-        // 1레벨(현재 0레벨) 건설 시에는 기본값, 이후 레벨 상승 시마다 비용 및 시간이 증가합니다.
-        int costMultiplier = instance.currentLevel + 1;
-        int requiredGold = template.BaseCost * costMultiplier;
-        float buildTime = template.BaseBuildTime * costMultiplier;
+        // 4. 레벨별 테이블 데이터 기반 비용 및 시간 획득
+        // 현재 레벨 인덱스를 안전하게 계산하여 바운더리 체크
+        int currentLevelIndex = Mathf.Clamp(instance.currentLevel, 0, template.MaxLevel);
+        BuildingLevelEnv levelEnv = template.levelSettings[currentLevelIndex];
+
+        int requiredGold = levelEnv.upgradeCost;
+        float buildTime = levelEnv.buildDuration;
 
         // 5. CurrencyManager를 통한 전역 재화 소모 연동
         if (CurrencyManager.Instance != null)

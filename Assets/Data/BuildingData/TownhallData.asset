@@ -12,8 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6abe7b6134b3ec94a8831868e7edb44f, type: 3}
   m_Name: TownhallData
   m_EditorClassIdentifier: 
-  buildingID: TownHall
+  buildingID: HQ
   buildingName: TownHall
-  baseCost: 100
-  baseBuildTime: 5
-  maxLevel: 3
+  levelSettings:
+  - level: 0
+    upgradeCost: 100
+    buildDuration: 3
+    visualSprite: {fileID: 599616928515528529, guid: fc2596969ce4159478983c0d79e57581, type: 3}
+  - level: 1
+    upgradeCost: 300
+    buildDuration: 5
+    visualSprite: {fileID: -8398296447445959012, guid: ca98e2005da7f6748a21c04eeda9a0df, type: 3}

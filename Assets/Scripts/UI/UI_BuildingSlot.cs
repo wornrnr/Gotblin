@@ -89,9 +89,13 @@ public class UI_BuildingSlot : MonoBehaviour
             if (timerText != null && !timerText.gameObject.activeSelf)
                 timerText.gameObject.SetActive(true);
 
-            // 비선형 빌드 시간 공식: (기본 빌드 시간 * 타겟 레벨)
-            int targetLevel = cachedInstance.currentLevel + 1;
-            float totalBuildTime = cachedData.BaseBuildTime * targetLevel;
+            // 테이블 기반 실시간 진행 시간 계산
+            int currentLevelIndex = Mathf.Clamp(cachedInstance.currentLevel, 0, cachedData.MaxLevel);
+            float totalBuildTime = 0f;
+            if (cachedData.levelSettings != null && cachedData.levelSettings.Count > currentLevelIndex)
+            {
+                totalBuildTime = cachedData.levelSettings[currentLevelIndex].buildDuration;
+            }
             float elapsed = totalBuildTime - cachedInstance.remainingTime;
 
             // 슬라이더 진행 게이지 동기화
@@ -163,8 +167,12 @@ public class UI_BuildingSlot : MonoBehaviour
         }
         else
         {
-            int costMultiplier = cachedInstance.currentLevel + 1;
-            int requiredGold = cachedData.BaseCost * costMultiplier;
+            int currentLevelIndex = Mathf.Clamp(cachedInstance.currentLevel, 0, cachedData.MaxLevel);
+            int requiredGold = 0;
+            if (cachedData.levelSettings != null && cachedData.levelSettings.Count > currentLevelIndex)
+            {
+                requiredGold = cachedData.levelSettings[currentLevelIndex].upgradeCost;
+            }
 
             if (costText != null)
             {

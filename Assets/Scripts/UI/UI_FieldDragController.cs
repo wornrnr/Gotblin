@@ -10,6 +10,9 @@ using UnityEngine.EventSystems;
 [RequireComponent(typeof(RectTransform))]
 public class UI_FieldDragController : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    // 드래그 컨트롤러 싱글톤 인스턴스
+    public static UI_FieldDragController Instance { get; private set; }
+
     [Header("기준 연동 트랜스폼")]
     [Tooltip("이동 및 드래그 처리를 진행할 최하단 근경/필드 루트 RectTransform입니다.")]
     [SerializeField] private RectTransform targetFieldRoot;
@@ -28,12 +31,22 @@ public class UI_FieldDragController : MonoBehaviour, IBeginDragHandler, IDragHan
     private Vector2 velocity = Vector2.zero;
     private bool isDragging = false;
 
+    /// <summary>
+    /// 현재 필드를 유저가 터치/마우스로 드래그 중인지 여부입니다.
+    /// </summary>
+    public bool IsDragging => isDragging;
+
     // 실시간 클램프 바운더리 한계값
     private float minX, maxX;
     private float minY, maxY;
 
     private void Awake()
     {
+        // 싱글톤 세팅
+        if (Instance == null)
+        {
+            Instance = this;
+        }
         myRectTransform = GetComponent<RectTransform>();
     }
 
