@@ -89,6 +89,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isEnemy: 1
+  isBoss: 1
   isDecorationMode: 0
   maxHP: 100
   currentHP: 0

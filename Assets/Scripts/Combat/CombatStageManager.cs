@@ -33,6 +33,9 @@ public class CombatStageManager : MonoBehaviour
     [Tooltip("아군 대표 히어로 고블린의 트랜스폼 레퍼런스입니다.")]
     [SerializeField] private Transform heroGoblin;
 
+    [Tooltip("카메라 Clamp 범위를 연산하기 위한 배경 이미지 판 RectTransform입니다.")]
+    [SerializeField] private RectTransform battleBackground;
+
     [Header("벨트스크롤 연출 설정")]
     [Tooltip("스테이지 이동 연출 시 화면 스크롤이 진행될 시간(초)입니다.")]
     [SerializeField] private float scrollDuration = 2.0f;
@@ -51,6 +54,7 @@ public class CombatStageManager : MonoBehaviour
     // 스크롤 연출 시작 좌표 기억용
     private Vector2 initialFieldPos;
     private Vector3 initialHeroPos;
+    private Vector3 heroInitialWorldPos; // 영웅의 전장 복귀용 절대 월드 위치 기억 필드
     private Coroutine activeTransitionCoroutine;
 
     private void Awake()
@@ -87,6 +91,7 @@ public class CombatStageManager : MonoBehaviour
         if (heroGoblin != null)
         {
             initialHeroPos = heroGoblin.localPosition;
+            heroInitialWorldPos = heroGoblin.position; // 월드 기준 초기 시작점 기억
         }
 
         // 시작 시 아군 고블린을 연출용 무적 모드로 최초 지정
@@ -95,7 +100,37 @@ public class CombatStageManager : MonoBehaviour
 
     private void Update()
     {
-        // ChallengeMode 상태일 때만 보스 처치 타이머 가동 및 실시간 승패 체크
+        // 1. [카메라 팔로우 및 Clamp 제약 기능]: 트랜지션(카메라 강제 연출 중)이 아닐 때만 영웅 추적을 수행
+        if (currentMode != CombatMode.Transition && heroGoblin != null && combatFieldContext != null)
+        {
+            RectTransform heroRect = heroGoblin.GetComponent<RectTransform>();
+            if (heroRect != null)
+            {
+                // 영웅 위치에 따른 기본 카메라 목표 좌표 계산
+                float targetCameraX = -heroRect.anchoredPosition.x;
+
+                // [기획 규칙 추가]: 카메라가 배경 이미지의 좌측/우측 끝을 벗어나지 않도록 한계선(Clamp) 계산
+                if (battleBackground != null)
+                {
+                    float halfScreenWidth = Screen.width * 0.5f;
+
+                    // 배경이 가로로 넓다고 가정할 때, 카메라(중앙)가 갈 수 있는 최소/최대 X 제약
+                    float minCameraX = -(battleBackground.rect.width * 0.5f) + halfScreenWidth;
+                    float maxCameraX = (battleBackground.rect.width * 0.5f) - halfScreenWidth;
+
+                    // UGUI 계산식 피벗 대칭 보정 Clamp 적용
+                    targetCameraX = Mathf.Clamp(targetCameraX, minCameraX, maxCameraX);
+                }
+
+                // Y축은 기존 마당판의 높이를 유지하고 X축만 추적
+                Vector2 targetPos = new Vector2(targetCameraX, combatFieldContext.anchoredPosition.y);
+                
+                // Time.deltaTime을 활용해 카메라가 홱홱 튀지 않고 부드럽게(Lerp) 따라가도록 보정
+                combatFieldContext.anchoredPosition = Vector2.Lerp(combatFieldContext.anchoredPosition, targetPos, Time.deltaTime * 5f);
+            }
+        }
+
+        // 2. 기존 보스전 승패 판정 감시: ChallengeMode 상태일 때만 보스 처치 타이머 가동 및 실시간 승패 체크
         if (currentMode == CombatMode.ChallengeMode)
         {
             challengeTimer += Time.deltaTime;
@@ -128,80 +163,112 @@ public class CombatStageManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 도전 버튼을 클릭했을 때 방치 모드에서 보스전으로 상태를 전이시킵니다.
+    /// 도전 버튼을 클릭했을 때 방치 모드에서 보스전 진입 연출(Transition)로 전이시킵니다.
     /// </summary>
     public void TriggerChallengeMode()
     {
-        if (currentMode != CombatMode.IdleMode)
-        {
-            Debug.LogWarning("[CombatStageManager] IdleMode 상태에서만 보스 도전을 시작할 수 있습니다.");
-            return;
-        }
-
+        if (currentMode == CombatMode.Transition) return;
+        
+        currentMode = CombatMode.Transition;
+        
         if (activeTransitionCoroutine != null)
         {
             StopCoroutine(activeTransitionCoroutine);
         }
-        activeTransitionCoroutine = StartCoroutine(ChallengeTransitionSequence());
+        activeTransitionCoroutine = StartCoroutine(BossAppearanceSequence());
     }
 
     /// <summary>
-    /// 방치 몬스터 회수 및 벨트스크롤 전진 화면 무빙을 수행하는 코루틴 시퀀스입니다.
+    /// 시네마틱 카메라 연출: 보스 먼저 클로즈업 ➡️ 1초 대기 ➡️ 아군 고블린으로 카메라 복귀 ➡️ 진검승부 개시
     /// </summary>
-    private IEnumerator ChallengeTransitionSequence()
+    private IEnumerator BossAppearanceSequence()
     {
-        currentMode = CombatMode.Transition;
-        Debug.Log("<color=yellow><b>[CombatStageManager] 보스 도전 연출을 실행합니다.</b></color>");
+        Debug.Log("<color=yellow><b>[CombatStageManager] 시네마틱 보스 등장 연출을 개시합니다.</b></color>");
 
-        // [시퀀스 1]: 현재 필드의 모든 일반 몬스터 즉시 소거 회수
+        // 1. 기존 방치 모드의 일반 몬스터 즉시 싹쓸이
         if (EnemySpawner.Instance != null)
         {
             EnemySpawner.Instance.ClearAllActiveEnemies();
         }
 
-        // [시퀀스 2]: 아군 고블린이 우측으로 달리고 배경이 뒤로 밀려나는 벨트스크롤 연출
-        SetHeroDecorationMode(true); // 연출 도중에는 대미지 무시
+        // 연출 도중 아군 고블린의 생명력 보존을 위해 무적화 적용
+        SetHeroDecorationMode(true);
 
-        float elapsed = 0f;
-        Vector2 startFieldPos = combatFieldContext.anchoredPosition;
-        Vector2 targetFieldPos = startFieldPos - new Vector2(scrollDistance, 0f); // 배경을 왼쪽으로 밀어 전진 감각 생성
+        // 2. 보스 즉시 스폰 (참조값 받아오기)
+        BaseCombatUnit bossUnit = EnemySpawner.Instance != null ? EnemySpawner.Instance.SpawnStageBoss() : null;
+        spawnedBossUnit = bossUnit; // 보스전 승패 감지용 실시간 바인딩 완료
 
-        Vector3 startHeroPos = heroGoblin != null ? heroGoblin.localPosition : Vector3.zero;
-        Vector3 targetHeroPos = startHeroPos + new Vector3(150f, 0f, 0f); // 고블린도 살짝 화면 우측으로 돌격 전진
-
-        while (elapsed < scrollDuration)
+        if (bossUnit == null || heroGoblin == null)
         {
-            elapsed += Time.deltaTime;
-            float t = elapsed / scrollDuration;
-            float smoothT = Mathf.SmoothStep(0f, 1f, t); // 부드러운 가감속 보간
-
-            if (combatFieldContext != null)
-            {
-                combatFieldContext.anchoredPosition = Vector2.Lerp(startFieldPos, targetFieldPos, smoothT);
-            }
-            if (heroGoblin != null)
-            {
-                heroGoblin.localPosition = Vector3.Lerp(startHeroPos, targetHeroPos, smoothT);
-            }
-
-            yield return null;
+            Debug.LogError("[CombatStageManager] 보스 유닛 혹은 아군 고블린 레퍼런스가 없어 연출을 취소하고 즉시 전투를 시작합니다.");
+            currentMode = CombatMode.ChallengeMode;
+            yield break;
         }
 
-        if (combatFieldContext != null) combatFieldContext.anchoredPosition = targetFieldPos;
-        if (heroGoblin != null) heroGoblin.localPosition = targetHeroPos;
+        RectTransform bossRect = bossUnit.GetComponent<RectTransform>();
+        RectTransform heroRect = heroGoblin.GetComponent<RectTransform>();
 
-        // [시퀀스 3]: 연출 종료 후 보스 소환 및 진검승부 개시
-        SetHeroDecorationMode(false); // 보스전 시작 시 대미지 적용 (진검승부)
-        
-        if (EnemySpawner.Instance != null)
+        if (bossRect == null || heroRect == null)
         {
-            // 스폰된 보스의 레퍼런스를 실시간으로 바인딩하여 HP 추적 개시
-            spawnedBossUnit = EnemySpawner.Instance.SpawnStageBoss();
+            currentMode = CombatMode.ChallengeMode;
+            yield break;
         }
 
+        // 3. 카메라 이동: 보스를 향해 부드럽게 패닝 (보스가 화면 우측에 적당히 보이도록 스크린 오프셋 조절)
+        float targetXForBoss = -bossRect.anchoredPosition.x + (Screen.width * 0.2f);
+        yield return StartCoroutine(PanCameraTo(targetXForBoss, 1.0f));
+
+        // 4. 보스를 비춘 상태로 잠시 대기 (시각적 긴장감 연출)
+        yield return new WaitForSeconds(1.0f);
+
+        // 5. 카메라 이동: 다시 히어로 고블린을 향해 패닝
+        float targetXForHero = -heroRect.anchoredPosition.x;
+        yield return StartCoroutine(PanCameraTo(targetXForHero, 0.8f));
+
+        // 6. 시퀀스 종료 및 진짜 진검승부 돌입
+        SetHeroDecorationMode(false); // 고블린 무적 상태 해제
         challengeTimer = 0f;
         currentMode = CombatMode.ChallengeMode;
-        Debug.Log($"[CombatStageManager] ChallengeTransitionSequence 연출 코루틴이 무사히 완료되어 보스전을 개시합니다. (현재 모드: {currentMode})");
+        
+        Debug.Log($"[CombatStageManager] 시네마틱 연출이 정상 완료되어 보스전을 개시합니다. (현재 모드: {currentMode})");
+    }
+
+    /// <summary>
+    /// 부드러운 카메라(배경판) 이동을 담당하는 공통 코루틴 함수 (SmoothStep 가감속 활용)
+    /// </summary>
+    private IEnumerator PanCameraTo(float targetX, float duration)
+    {
+        float time = 0f;
+        Vector2 startPos = combatFieldContext.anchoredPosition;
+        Vector2 targetPos = new Vector2(targetX, combatFieldContext.anchoredPosition.y);
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            // SmoothStep을 사용하여 시작과 끝이 부드러운 카메라 가감속 연출
+            float t = Mathf.SmoothStep(0f, 1f, time / duration);
+            combatFieldContext.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+        combatFieldContext.anchoredPosition = targetPos;
+    }
+
+    /// <summary>
+    /// 보스 몬스터 사망 즉시 영웅 추적을 멈추고 승리 시퀀스로 전이하는 메서드입니다.
+    /// </summary>
+    public void OnBossKilled()
+    {
+        // 카메라가 더 이상 움직이지 않도록 즉시 연출(Transition) 상태로 묶어버립니다.
+        currentMode = CombatMode.Transition;
+        
+        Debug.Log("[시스템] 스테이지 보스 처치 완료! 카메라를 현 위치에 고정하고 승리 연출을 전개합니다.");
+
+        // 승리 퇴치 연출 코루틴을 즉각 가동시킵니다.
+        if (activeTransitionCoroutine != null)
+        {
+            StopCoroutine(activeTransitionCoroutine);
+        }
+        activeTransitionCoroutine = StartCoroutine(WinSequence());
     }
 
     /// <summary>
@@ -227,49 +294,47 @@ public class CombatStageManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 승리 시: 보스를 소멸시키고, 맵을 한 번 더 전진 스크롤 시킨 후 다음 스테이지로 갱신하여 복귀합니다.
+    /// 승리 시: 영웅을 화면 우측 너머로 걸어나가 퇴장하게 하고, 좌표를 초기화해 다음 스테이지 방치 모드로 진입합니다.
     /// </summary>
     private IEnumerator WinSequence()
     {
-        currentMode = CombatMode.Transition;
-        Debug.Log("<color=cyan><b>[CombatStageManager] 보스 퇴치 완료! 다음 지역으로 전진합니다.</b></color>");
+        Debug.Log("<color=cyan><b>[CombatStageManager] 스테이지 클리어! 다음 구역으로 영웅이 행진 퇴장합니다.</b></color>");
 
-        // 보스 잔당 소거
+        // 1. 영웅 고블린에게 우측 화면 밖 퇴장 걷기 명령 하달
+        BaseCombatUnit heroUnit = heroGoblin != null ? heroGoblin.GetComponent<BaseCombatUnit>() : null;
+        if (heroUnit != null)
+        {
+            heroUnit.MoveToRightExit();
+        }
+
+        // 씬 내 남아있는 모든 적 잔당 일괄 삭제 소거
         if (EnemySpawner.Instance != null)
         {
             EnemySpawner.Instance.ClearAllActiveEnemies();
         }
 
-        // [연출] 배경판을 한번 더 밀어 맵 변경 연출
-        float elapsed = 0f;
-        Vector2 startFieldPos = combatFieldContext.anchoredPosition;
-        Vector2 targetFieldPos = startFieldPos - new Vector2(scrollDistance, 0f);
+        // 2. 영웅이 화면 우측 경계면 밖으로 완전 퇴장하는 모습을 2.5초간 대기 감상
+        yield return new WaitForSeconds(2.5f);
 
-        while (elapsed < scrollDuration)
+        // 3. [좌표 및 상태 초기화 리셋]
+        if (heroUnit != null)
         {
-            elapsed += Time.deltaTime;
-            float t = elapsed / scrollDuration;
-            float smoothT = Mathf.SmoothStep(0f, 1f, t);
-
-            if (combatFieldContext != null)
-            {
-                combatFieldContext.anchoredPosition = Vector2.Lerp(startFieldPos, targetFieldPos, smoothT);
-            }
-
-            yield return null;
+            heroUnit.ResetToInitialPosition(heroInitialWorldPos);
         }
 
-        // 스테이지 레벨 업
+        // 배경판 앵커 좌표도 전장 초기 한가운데 위치로 강제 원복 리셋
+        if (combatFieldContext != null)
+        {
+            combatFieldContext.anchoredPosition = initialFieldPos;
+        }
+
+        // 스테이지 카운트 증가 돌파
         currentStage++;
+        Debug.Log($"[시스템] {currentStage} 스테이지 돌파 완료! 일반 방치 모드로 복귀합니다.");
 
-        // 배경판 및 아군 고블린 좌표 초기 위치로 순간 이동 리셋
-        if (combatFieldContext != null) combatFieldContext.anchoredPosition = initialFieldPos;
-        if (heroGoblin != null) heroGoblin.localPosition = initialHeroPos;
-
-        // 다시 평화로운 방치 파밍 모드로 복귀 (아군 무적화)
+        // 다시 히어로를 연출 무적화 상태로 셋업하고 방치 파밍 모드로 복구
         SetHeroDecorationMode(true);
         currentMode = CombatMode.IdleMode;
-        Debug.Log($"[CombatStageManager] WinSequence 연출 코루틴이 무사히 완료되어 파밍 모드로 복귀했습니다. (현재 모드: {currentMode})");
     }
 
     /// <summary>

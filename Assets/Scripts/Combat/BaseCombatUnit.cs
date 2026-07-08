@@ -18,6 +18,9 @@ public class BaseCombatUnit : MonoBehaviour
     [Tooltip("true 이면 몬스터(적군) 진영이며, false 이면 고블린(아군 플레이어) 진영입니다.")]
     public bool isEnemy;
 
+    [Tooltip("이 유닛이 스테이지 보스인지 여부입니다. 인스펙터에서 보스 프리팹은 체크해 주세요.")]
+    public bool isBoss;
+
     [Tooltip("전투 진행 중 사망이나 체력 차감이 일어나지 않는 가짜 연출 전용 유닛인지 여부입니다.")]
     public bool isDecorationMode = false;
 
@@ -50,6 +53,28 @@ public class BaseCombatUnit : MonoBehaviour
 
     // 포위 연출 시 겹침 방지를 위해 지정되는 고유의 타겟 타격 오프셋 벡터
     private Vector3 attackPositionOffset;
+
+    // 보스 처치 후 오른쪽 퇴장 걷기 연출 작동 제어용 플래그
+    private bool isVictoryWalking = false;
+
+    /// <summary>
+    /// 보스 퇴치 후 영웅에게 전방위 AI를 종료하고 강제로 우측 화면 퇴장 명령을 내립니다.
+    /// </summary>
+    public void MoveToRightExit()
+    {
+        isVictoryWalking = true;
+    }
+
+    /// <summary>
+    /// 퇴장이 완료된 영웅을 초기 전장 시작 지점으로 복귀 및 체력 완충 리셋시킵니다.
+    /// </summary>
+    public void ResetToInitialPosition(Vector3 initialWorldPos)
+    {
+        isVictoryWalking = false;
+        transform.position = initialWorldPos;
+        currentHP = maxHP;
+        currentState = UnitState.Idle;
+    }
 
     // 외부 연동 및 상대 픽셀 거리 측정을 위한 RectTransform 노출 프로퍼티
     public RectTransform MyRect => rectTransform;
@@ -124,6 +149,32 @@ public class BaseCombatUnit : MonoBehaviour
         if (currentHP <= 0)
         {
             Die();
+            return;
+        }
+
+        // [기획 규칙 추가] 승리 퇴장 연출 중에는 적인 타겟 유무와 무관하게 오른쪽으로 전진합니다.
+        if (isVictoryWalking)
+        {
+            // 우측 방향 벡터 이동 (Z축 고정 방어 내장)
+            Vector3 nextPos = transform.position + Vector3.right * moveSpeed * Time.deltaTime;
+            nextPos.z = 0f;
+            transform.position = nextPos;
+
+            // 우측 걷기이므로 X 스케일 플립 처리도 정상 방향 유지
+            Vector3 scale = transform.localScale;
+            scale.x = Mathf.Abs(scale.x);
+            transform.localScale = scale;
+
+            currentState = UnitState.Chasing; // 걷기 모션 FSM 강제
+            return;
+        }
+
+        // [기획 규칙 추가] 카메라 연출(Transition) 중에는 아군 유닛의 AI 작동을 일시정지시킵니다.
+        if (!isEnemy && CombatStageManager.Instance != null && 
+            CombatStageManager.Instance.currentMode == CombatMode.Transition)
+        {
+            // 연출 시간 동안 제자리에 멈춰 서서 대기합니다.
+            currentState = UnitState.Idle;
             return;
         }
 
@@ -262,6 +313,12 @@ public class BaseCombatUnit : MonoBehaviour
         currentHP = 0;
 
         Debug.Log($"<color=red><b>[{gameObject.name}]</b></color> 사망하여 전장 및 메모리에서 제거됩니다.");
+
+        // [추가]: 내가 스테이지 보스였다면 사망 즉시 매니저에게 카메라 추적 락 신호 보고
+        if (isBoss && CombatStageManager.Instance != null)
+        {
+            CombatStageManager.Instance.OnBossKilled();
+        }
 
         // [코딩 제약 조건] 전투 관리자 풀 리스트에서 즉시 제거(Remove) 수행
         if (CombatManager.Instance != null)

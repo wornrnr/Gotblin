@@ -114,19 +114,23 @@ public class EnemySpawner : MonoBehaviour
         RectTransform selectedPoint = isLeft ? leftSpawnPoint : rightSpawnPoint;
         if (selectedPoint == null) return;
 
-        // [Y축 무작위 좌표 계산]: 배경 판 높이 기준 마진 패딩 제외 범위
-        float height = battleBackground.rect.height;
-        float minY = -height / 2f + yPadding;
-        float maxY = height / 2f - yPadding;
-        float randomY = Random.Range(minY, maxY);
+        // [월드 좌표계 기반 절대 스폰 위치 연산]: 스크롤이동 시의 로컬 좌표 편향 오류를 해결하기 위해 월드 좌표계 활용
+        Vector3[] corners = new Vector3[4];
+        battleBackground.GetWorldCorners(corners);
+
+        float spawnWorldMinY = corners[0].y + yPadding;
+        float spawnWorldMaxY = corners[1].y - yPadding;
+        float randomWorldY = Random.Range(spawnWorldMinY, spawnWorldMaxY);
+
+        // 스폰 포인트 X축 역시 월드 좌표(transform.position.x) 기준
+        float spawnWorldX = isLeft ? leftSpawnPoint.position.x : rightSpawnPoint.position.x;
 
         // [UGUI 프리팹 스케일 꼬임 방지 Instantiate 옵션 적용]
         GameObject enemy = Instantiate(normalEnemyPrefab, spawnParent, false);
-        RectTransform enemyRect = enemy.GetComponent<RectTransform>();
         
-        float spawnX = isLeft ? leftSpawnPoint.anchoredPosition.x : rightSpawnPoint.anchoredPosition.x;
-        enemyRect.anchoredPosition = new Vector2(spawnX, randomY);
-        enemyRect.localScale = Vector3.one; // 크기 1, 1, 1 고정
+        // 월드 좌표 덮어쓰기 적용 (UI 로컬 앵커 꼬임 완전 차단)
+        enemy.transform.position = new Vector3(spawnWorldX, randomWorldY, enemy.transform.position.z);
+        enemy.transform.localScale = Vector3.one; // 크기 1, 1, 1 고정
 
         // 3. 전투 AI 스탯 설정
         BaseCombatUnit unit = enemy.GetComponent<BaseCombatUnit>();
@@ -151,27 +155,22 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 우측 스폰 포인트 영역에 Y축 레인을 적용해 진검승부(isDecorationMode = false)용 보스 몬스터를 소환합니다.
+    /// 시네마틱 카메라 연출을 위해 배경 이미지(BattleBackground)의 가장 오른쪽 끝 영역에 보스를 로컬 좌표 기준으로 소환합니다.
     /// </summary>
     public BaseCombatUnit SpawnStageBoss()
     {
-        if (bossEnemyPrefab == null || spawnParent == null || rightSpawnPoint == null || battleBackground == null) return null;
+        if (bossEnemyPrefab == null || spawnParent == null || battleBackground == null) return null;
 
-        Debug.Log("[EnemySpawner] 스테이지 보스를 소환합니다!");
-
-        // [Y축 무작위 좌표 계산]
-        float height = battleBackground.rect.height;
-        float minY = -height / 2f + yPadding;
-        float maxY = height / 2f - yPadding;
-        float randomY = Random.Range(minY, maxY);
+        Debug.Log("[EnemySpawner] 시네마틱 연출을 위해 보스를 배경 판 우측 경계선에 소환합니다!");
 
         // [UGUI 프리팹 스케일 꼬임 방지 Instantiate 옵션 적용]
         GameObject enemy = Instantiate(bossEnemyPrefab, spawnParent, false);
-        RectTransform enemyRect = enemy.GetComponent<RectTransform>();
+        RectTransform bossRect = enemy.GetComponent<RectTransform>();
         
-        float spawnX = rightSpawnPoint.anchoredPosition.x;
-        enemyRect.anchoredPosition = new Vector2(spawnX, randomY);
-        enemyRect.localScale = Vector3.one; // 크기 1, 1, 1 고정
+        // battleBackground의 오른쪽 끝(xMax) 좌표를 구하여 약간의 여백(150f)을 두고 배치 (Y축은 0f 중앙 고정)
+        float bossSpawnX = battleBackground.rect.xMax - 150f;
+        bossRect.anchoredPosition = new Vector2(bossSpawnX, 0f);
+        bossRect.localScale = Vector3.one; // 크기 1, 1, 1 고정
 
         // 2. 보스 진검승부 모드 활성화 (isDecorationMode = false)
         BaseCombatUnit bossUnit = enemy.GetComponent<BaseCombatUnit>();

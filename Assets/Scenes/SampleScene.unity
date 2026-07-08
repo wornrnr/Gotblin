@@ -3596,13 +3596,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isEnemy: 0
+  isBoss: 0
   isDecorationMode: 0
-  maxHP: 100
+  maxHP: 1000
   currentHP: 0
-  attackDamage: 1
+  attackDamage: 100
   attackRange: 1
-  attackCooldown: 1.2
-  moveSpeed: 100
+  attackCooldown: 0.5
+  moveSpeed: 1000
   currentState: 0
 --- !u!1 &1503040828
 GameObject:
@@ -4636,7 +4637,7 @@ MonoBehaviour:
   leftSpawnPoint: {fileID: 1780622016}
   rightSpawnPoint: {fileID: 1025917408}
   battleBackground: {fileID: 163480537}
-  yPadding: 1
+  yPadding: 0
   spawnInterval: 2
 --- !u!114 &1862190769
 MonoBehaviour:
@@ -4654,6 +4655,7 @@ MonoBehaviour:
   currentStage: 1
   combatFieldContext: {fileID: 772956442}
   heroGoblin: {fileID: 1457181871}
+  battleBackground: {fileID: 163480537}
   scrollDuration: 2
   scrollDistance: 800
   challengeTimeLimit: 15
