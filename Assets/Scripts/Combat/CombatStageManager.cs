@@ -34,7 +34,7 @@ public class CombatStageManager : MonoBehaviour
     [SerializeField] private Transform heroGoblin;
 
     [Tooltip("카메라 Clamp 범위를 연산하기 위한 배경 이미지 판 RectTransform입니다.")]
-    [SerializeField] private RectTransform battleBackground;
+    public RectTransform battleBackground;
 
     [Header("벨트스크롤 연출 설정")]
     [Tooltip("스테이지 이동 연출 시 화면 스크롤이 진행될 시간(초)입니다.")]

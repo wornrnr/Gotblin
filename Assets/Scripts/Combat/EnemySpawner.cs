@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 방치 자동 전투(IdleMode) 진행 시 좌우 화면 경계에서 Y축 레인을 반영하여 몬스터를 무한 스폰시키고,
+/// 방치 자동 전투(IdleMode) 진행 시 좌우 화면 경계에서 Y축 레인을 반영하여 몬스터를 스폰시키고,
 /// 보스전 돌입 시 진검승부용 보스 유닛을 소환해 주는 적 스폰 매니저 클래스입니다.
-/// UGUI 캔버스 좌표계 스케일 꼬임을 완전히 해소한 픽셀 이동이 적용됩니다.
+/// 매번 유닛을 Instantiate/Destroy하지 않고 재사용하는 오브젝트 풀링(Object Pooling) 시스템이 도입되었습니다.
 /// </summary>
 [DisallowMultipleComponent]
 public class EnemySpawner : MonoBehaviour
@@ -36,13 +36,20 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("배경 판 위아래 테두리에서 이 수치만큼 안쪽 영역에서만 스폰되도록 마진을 둡니다.")]
     [SerializeField] private float yPadding = 50f;
 
+    [Header("오브젝트 풀링 설정")]
+    [Tooltip("게임 시작 시 미리 대기실에 생성해둘 일반 몬스터 수량입니다.")]
+    [SerializeField] private int initialPoolSize = 20;
+
     [Header("스폰 주기 설정")]
     [Tooltip("방치 파밍 모드 시 일반 몬스터가 생성될 간격 주기(초 단위)입니다.")]
     [SerializeField] private float spawnInterval = 2.0f;
 
     private float spawnTimer = 0f;
 
-    // 현재 씬에 생성되어 활동 중인 적 오브젝트 리스트 (일괄 소거용)
+    // 일반 몬스터 프리워밍용 오브젝트 풀 큐
+    private readonly Queue<GameObject> enemyPool = new Queue<GameObject>();
+
+    // 현재 전장에 활동 중인 모든 적 게임오브젝트 리스트 (일괄 소거/반납용)
     private readonly List<GameObject> activeEnemies = new List<GameObject>();
 
     private void Awake()
@@ -54,11 +61,23 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        if (normalEnemyPrefab == null || spawnParent == null) return;
+
+        // [최적화 - 프리워밍]: 대기 풀에 비활성화된 일반 잡몹들을 미리 생성하여 보관
+        for (int i = 0; i < initialPoolSize; i++)
+        {
+            GameObject enemy = Instantiate(normalEnemyPrefab, spawnParent, false);
+            enemy.SetActive(false);
+            enemyPool.Enqueue(enemy);
+        }
+    }
+
     private void Update()
     {
         if (CombatStageManager.Instance == null)
         {
-            // 매 프레임 찍히는 것을 예방하기 위해 주기적으로 또는 최초 경고만 로깅
             if (Time.frameCount % 300 == 0)
             {
                 Debug.LogWarning("[EnemySpawner] 씬 내에 활성화된 CombatStageManager.Instance를 찾을 수 없어 몬스터 스폰 타이머가 일시정지 중입니다.");
@@ -66,7 +85,7 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        // [코딩 제약 조건] 방치 파밍 모드(IdleMode)일 때만 일반 몬스터 주기적 스폰
+        // 방치 파밍 모드(IdleMode)일 때만 일반 몬스터 주기적 스폰
         if (CombatStageManager.Instance.currentMode == CombatMode.IdleMode)
         {
             spawnTimer += Time.deltaTime;
@@ -83,38 +102,83 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 화면의 왼쪽 혹은 오른쪽 외곽 중 임의 한 곳을 선정해 Y축 레인 오프셋을 더해 잡몹을 무적 데코 모드로 생성합니다.
+    /// 오브젝트 풀에서 잡몹을 안전하게 인계받아 활성화시키고 컴포넌트 상태를 완벽히 리셋해 반환합니다.
+    /// </summary>
+    public GameObject GetEnemyFromPool()
+    {
+        GameObject enemy;
+
+        if (enemyPool.Count > 0)
+        {
+            enemy = enemyPool.Dequeue();
+            if (enemy == null)
+            {
+                // 에디터 씬 강제 삭제 등의 특수 경우 예외 방어용 생성
+                enemy = Instantiate(normalEnemyPrefab, spawnParent, false);
+            }
+            else
+            {
+                enemy.SetActive(true);
+            }
+        }
+        else
+        {
+            // 순간적으로 가용 수량이 부족할 경우 동적 확장
+            enemy = Instantiate(normalEnemyPrefab, spawnParent, false);
+        }
+
+        // [초기화 청소]: 재사용 유닛의 스탯 및 넉백/피격 연출 상태를 완전히 태초 상태로 복구
+        BaseCombatUnit unitScript = enemy.GetComponent<BaseCombatUnit>();
+        if (unitScript != null)
+        {
+            unitScript.ResetUnitStateForReuse();
+        }
+
+        return enemy;
+    }
+
+    /// <summary>
+    /// 전장에서 해제된 몬스터를 안전하게 풀 대기실로 회수하여 보관합니다.
+    /// </summary>
+    public void ReturnEnemyToPool(GameObject enemy)
+    {
+        if (enemy == null) return;
+
+        BaseCombatUnit unit = enemy.GetComponent<BaseCombatUnit>();
+        if (unit != null)
+        {
+            // 전투 매니저 리스트 풀에서 제거 진행
+            if (CombatManager.Instance != null)
+            {
+                CombatManager.Instance.UnregisterUnit(unit);
+            }
+
+            // [보스 예외 필터링]: 보스 몬스터는 풀링 대상이 아니므로 풀에 들이지 않고 완전 제거 처리
+            if (unit.isBoss)
+            {
+                Destroy(enemy);
+                return;
+            }
+        }
+
+        enemy.SetActive(false);
+        enemyPool.Enqueue(enemy);
+    }
+
+    /// <summary>
+    /// 화면의 왼쪽 혹은 오른쪽 외곽 중 임의 한 곳을 선정해 오브젝트 풀을 활용하여 잡몹을 무적 데코 모드로 생성합니다.
     /// </summary>
     private void SpawnNormalEnemy()
     {
-        // [디버그 방어 로그 강화]
-        if (normalEnemyPrefab == null)
-        {
-            Debug.LogError("[EnemySpawner] normalEnemyPrefab(잡몹 프리팹)이 인스펙터에 등록되지 않아 스폰을 차단합니다!");
-            return;
-        }
-        if (spawnParent == null)
-        {
-            Debug.LogError("[EnemySpawner] spawnParent(스폰 부모 캔버스)가 인스펙터에 등록되지 않아 스폰을 차단합니다!");
-            return;
-        }
-        if (battleBackground == null)
-        {
-            Debug.LogError("[EnemySpawner] battleBackground(배경 판)가 인스펙터에 등록되지 않아 스폰을 차단합니다!");
-            return;
-        }
-        if (leftSpawnPoint == null || rightSpawnPoint == null)
-        {
-            Debug.LogError("[EnemySpawner] leftSpawnPoint 또는 rightSpawnPoint가 지정되지 않아 스폰 위치를 잡지 못했습니다!");
-            return;
-        }
+        if (normalEnemyPrefab == null || spawnParent == null || battleBackground == null) return;
+        if (leftSpawnPoint == null || rightSpawnPoint == null) return;
 
         // 1. 무작위 스폰 포인트 선택 (좌/우 분기)
         bool isLeft = Random.value > 0.5f;
         RectTransform selectedPoint = isLeft ? leftSpawnPoint : rightSpawnPoint;
         if (selectedPoint == null) return;
 
-        // [월드 좌표계 기반 절대 스폰 위치 연산]: 스크롤이동 시의 로컬 좌표 편향 오류를 해결하기 위해 월드 좌표계 활용
+        // [월드 좌표계 기반 절대 스폰 위치 연산]
         Vector3[] corners = new Vector3[4];
         battleBackground.GetWorldCorners(corners);
 
@@ -122,15 +186,14 @@ public class EnemySpawner : MonoBehaviour
         float spawnWorldMaxY = corners[1].y - yPadding;
         float randomWorldY = Random.Range(spawnWorldMinY, spawnWorldMaxY);
 
-        // 스폰 포인트 X축 역시 월드 좌표(transform.position.x) 기준
         float spawnWorldX = isLeft ? leftSpawnPoint.position.x : rightSpawnPoint.position.x;
 
-        // [UGUI 프리팹 스케일 꼬임 방지 Instantiate 옵션 적용]
-        GameObject enemy = Instantiate(normalEnemyPrefab, spawnParent, false);
+        // 2. [풀링 연동]: Instantiate 대신 풀을 통해 객체 획득
+        GameObject enemy = GetEnemyFromPool();
         
-        // 월드 좌표 덮어쓰기 적용 (UI 로컬 앵커 꼬임 완전 차단)
+        // 위치 지정 및 로컬 스케일 리셋
         enemy.transform.position = new Vector3(spawnWorldX, randomWorldY, enemy.transform.position.z);
-        enemy.transform.localScale = Vector3.one; // 크기 1, 1, 1 고정
+        enemy.transform.localScale = Vector3.one;
 
         // 3. 전투 AI 스탯 설정
         BaseCombatUnit unit = enemy.GetComponent<BaseCombatUnit>();
@@ -138,16 +201,13 @@ public class EnemySpawner : MonoBehaviour
         {
             unit.isEnemy = true;
             
-            // [버그 해결]: 아군(고블린)은 방치 모드 동안 무적으로 유지되지만, 적들은 아군의 공격을 받아 체력이 깎이고 사망할 수 있도록 무적(isDecorationMode)을 해제합니다.
+            // 일반 몬스터이므로 무적 해제 (체력 닳아서 사망/반납 가능)
             unit.isDecorationMode = false;
 
-            // [전역 타겟팅 연동] 전투 매니저 적 목록 리스트에 즉시 직접 추가
+            // [전역 타겟팅 연동] 전투 매니저 리스트에 등록
             if (CombatManager.Instance != null)
             {
-                if (!CombatManager.Instance.enemyUnits.Contains(unit))
-                {
-                    CombatManager.Instance.enemyUnits.Add(unit);
-                }
+                CombatManager.Instance.RegisterUnit(unit);
             }
         }
 
@@ -155,7 +215,7 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 시네마틱 카메라 연출을 위해 배경 이미지(BattleBackground)의 가장 오른쪽 끝 영역에 보스를 로컬 좌표 기준으로 소환합니다.
+    /// 우측 스폰 포인트 영역에 Y축 레인을 적용해 진검승부(isDecorationMode = false)용 보스 몬스터를 소환합니다.
     /// </summary>
     public BaseCombatUnit SpawnStageBoss()
     {
@@ -163,29 +223,23 @@ public class EnemySpawner : MonoBehaviour
 
         Debug.Log("[EnemySpawner] 시네마틱 연출을 위해 보스를 배경 판 우측 경계선에 소환합니다!");
 
-        // [UGUI 프리팹 스케일 꼬임 방지 Instantiate 옵션 적용]
+        // [UGUI 프리팹 스케일 꼬임 방지 Instantiate 옵션 적용] (보스는 풀링 비대상)
         GameObject enemy = Instantiate(bossEnemyPrefab, spawnParent, false);
         RectTransform bossRect = enemy.GetComponent<RectTransform>();
         
-        // battleBackground의 오른쪽 끝(xMax) 좌표를 구하여 약간의 여백(150f)을 두고 배치 (Y축은 0f 중앙 고정)
         float bossSpawnX = battleBackground.rect.xMax - 150f;
         bossRect.anchoredPosition = new Vector2(bossSpawnX, 0f);
-        bossRect.localScale = Vector3.one; // 크기 1, 1, 1 고정
+        bossRect.localScale = Vector3.one;
 
-        // 2. 보스 진검승부 모드 활성화 (isDecorationMode = false)
         BaseCombatUnit bossUnit = enemy.GetComponent<BaseCombatUnit>();
         if (bossUnit != null)
         {
             bossUnit.isEnemy = true;
-            bossUnit.isDecorationMode = false; // 아군 고블린과 진짜로 생명력을 깎으며 싸움
+            bossUnit.isDecorationMode = false;
 
-            // [전역 타겟팅 연동] 전투 매니저 적 목록 리스트에 즉시 직접 추가
             if (CombatManager.Instance != null)
             {
-                if (!CombatManager.Instance.enemyUnits.Contains(bossUnit))
-                {
-                    CombatManager.Instance.enemyUnits.Add(bossUnit);
-                }
+                CombatManager.Instance.RegisterUnit(bossUnit);
             }
         }
 
@@ -194,20 +248,20 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 전장 필드에 소환되어 있는 모든 몬스터(일반/보스 전체)를 즉각 소거 및 비활성화하여 풀로 회수합니다.
+    /// 전장 필드에 소환되어 있는 모든 몬스터를 Destroy가 아닌 풀로 회수하여 안전하게 비활성화 소거합니다.
     /// </summary>
     public void ClearAllActiveEnemies()
     {
-        // 역순 순회하며 메모리 파괴 진행
+        // 역순 순회하며 풀로 안전 반납 진행
         for (int i = activeEnemies.Count - 1; i >= 0; i--)
         {
             if (activeEnemies[i] != null)
             {
-                // 오브젝트 파괴 시 BaseCombatUnit.OnDestroy()에 의해 CombatManager 풀에서 자동 제외됨
-                Destroy(activeEnemies[i]);
+                // [풀링 연동]: Destroy 대신 ReturnEnemyToPool 호출
+                ReturnEnemyToPool(activeEnemies[i]);
             }
         }
         activeEnemies.Clear();
-        Debug.Log("[EnemySpawner] 필드 상의 모든 적이 비활성화 소거되었습니다.");
+        Debug.Log("[EnemySpawner] 필드 상의 모든 적이 풀로 안전하게 반납 및 비활성화되었습니다.");
     }
 }

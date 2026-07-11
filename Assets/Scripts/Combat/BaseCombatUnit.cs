@@ -75,6 +75,40 @@ public class BaseCombatUnit : MonoBehaviour
     }
 
     /// <summary>
+    /// 오브젝트 풀에서 유닛을 꺼내 재사용할 때 호출되는 상태 초기화 및 연출 찌꺼기 청소 함수입니다.
+    /// </summary>
+    public void ResetUnitStateForReuse()
+    {
+        // 1. 체력 완충
+        currentHP = maxHP;
+        
+        // 2. 타겟팅 및 상태 비활성 초기화
+        currentTarget = null;
+        isVictoryWalking = false;
+
+        // 3. [피격 찌꺼기 정리]: 넉백 코루틴 중단 및 크기, 컬러 원상복구
+        if (hitEffectCoroutine != null)
+        {
+            StopCoroutine(hitEffectCoroutine);
+            hitEffectCoroutine = null;
+        }
+        
+        transform.localScale = originalScale;
+        
+        if (unitImage == null)
+        {
+            unitImage = GetComponent<UnityEngine.UI.Image>();
+        }
+        
+        if (unitImage != null)
+        {
+            unitImage.color = originalColor;
+        }
+
+        currentState = UnitState.Idle;
+    }
+
+    /// <summary>
     /// 퇴장이 완료된 영웅을 초기 전장 시작 지점으로 복귀 및 체력 완충 리셋시킵니다.
     /// Vector3.zero(또는 zero 벡터)가 주어지면 UGUI 로컬 anchoredPosition 기준으로 Vector2.zero를 직접 대입합니다.
     /// </summary>
@@ -389,6 +423,26 @@ public class BaseCombatUnit : MonoBehaviour
 
         float knockbackDist = 20f; // 넉백될 최대 픽셀 거리
 
+        // [경계선 방어벽 추출]
+        float minX = float.MinValue, maxX = float.MaxValue;
+        float minY = float.MinValue, maxY = float.MaxValue;
+
+        if (CombatStageManager.Instance != null && CombatStageManager.Instance.battleBackground != null)
+        {
+            Vector3[] bgCorners = new Vector3[4];
+            CombatStageManager.Instance.battleBackground.GetWorldCorners(bgCorners);
+            
+            // 여백(bodyRadius)을 고려하여 유닛의 중심점이 배경 밖으로 나가지 않도록 경계선 설정
+            minX = bgCorners[0].x + bodyRadius;
+            maxX = bgCorners[2].x - bodyRadius;
+            minY = bgCorners[0].y + bodyRadius;
+            maxY = bgCorners[1].y - bodyRadius;
+
+            // min/max 뒤틀림 예방 안전장치
+            if (minX > maxX) { float temp = minX; minX = maxX; maxX = temp; }
+            if (minY > maxY) { float temp = minY; minY = maxY; maxY = temp; }
+        }
+
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
@@ -400,7 +454,13 @@ public class BaseCombatUnit : MonoBehaviour
 
             // 2) 탄성 넉백 연출: 밀렸다가 다시 원위치(startPosition)로 돌아오는 탄성 운동
             float motionCurve = Mathf.Sin(percent * Mathf.PI);
-            transform.position = startPosition + (knockbackDirection * knockbackDist * motionCurve);
+            Vector3 targetPosition = startPosition + (knockbackDirection * knockbackDist * motionCurve);
+
+            // [기획 규칙 추가] 계산된 넉백 위치가 배경화면을 절대 뚫고 나가지 못하도록 고정
+            targetPosition.x = Mathf.Clamp(targetPosition.x, minX, maxX);
+            targetPosition.y = Mathf.Clamp(targetPosition.y, minY, maxY);
+
+            transform.position = targetPosition;
 
             yield return null;
         }
@@ -416,7 +476,7 @@ public class BaseCombatUnit : MonoBehaviour
     }
 
     /// <summary>
-    /// 유닛 사망 처리를 수행하고 전투 감시 리스트에서 즉시 해제한 후 파괴합니다.
+    /// 유닛 사망 처리를 수행하고 전투 감시 리스트에서 즉시 해제한 후 파괴 또는 풀로 반납합니다.
     /// </summary>
     private void Die()
     {
@@ -425,29 +485,37 @@ public class BaseCombatUnit : MonoBehaviour
         currentState = UnitState.Dead;
         currentHP = 0;
 
-        Debug.Log($"<color=red><b>[{gameObject.name}]</b></color> 사망하여 전장 및 메모리에서 제거됩니다.");
+        Debug.Log($"<color=red><b>[{gameObject.name}]</b></color> 사망하여 전장에서 해제됩니다.");
 
-        // [추가]: 내가 스테이지 보스였다면 사망 즉시 매니저에게 카메라 추적 락 신호 보고
+        // 내가 스테이지 보스였다면 사망 즉시 매니저에게 카메라 추적 락 신호 보고
         if (isBoss && CombatStageManager.Instance != null)
         {
             CombatStageManager.Instance.OnBossKilled();
         }
 
-        // [코딩 제약 조건] 전투 관리자 풀 리스트에서 즉시 제거(Remove) 수행
+        // 전투 관리자 풀 리스트에서 즉시 제거 수행
         if (CombatManager.Instance != null)
         {
-            if (isEnemy)
+            CombatManager.Instance.UnregisterUnit(this);
+        }
+
+        // [풀링 반납 연동]: 일반 몬스터(isEnemy && !isBoss)라면 Destroy 하지 않고 풀에 안전 반납
+        if (isEnemy && !isBoss)
+        {
+            if (EnemySpawner.Instance != null)
             {
-                CombatManager.Instance.enemyUnits.Remove(this);
+                EnemySpawner.Instance.ReturnEnemyToPool(gameObject);
             }
             else
             {
-                CombatManager.Instance.playerUnits.Remove(this);
+                Destroy(gameObject);
             }
         }
-
-        // 사망 후 유닛 오브젝트 완전 파괴 (Null 포인터 예외 원천 예방)
-        Destroy(gameObject);
+        else
+        {
+            // 아군 고블린 및 보스 몬스터는 기존 방식대로 씬에서 완전 파괴(Destroy) 처리
+            Destroy(gameObject);
+        }
     }
 
     /// <summary>
