@@ -3601,7 +3601,7 @@ MonoBehaviour:
   maxHP: 1000
   currentHP: 0
   attackDamage: 100
-  attackRange: 1
+  attackRange: 10
   attackCooldown: 0.5
   moveSpeed: 1000
   currentState: 0

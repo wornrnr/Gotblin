@@ -54,7 +54,6 @@ public class CombatStageManager : MonoBehaviour
     // 스크롤 연출 시작 좌표 기억용
     private Vector2 initialFieldPos;
     private Vector3 initialHeroPos;
-    private Vector3 heroInitialWorldPos; // 영웅의 전장 복귀용 절대 월드 위치 기억 필드
     private Coroutine activeTransitionCoroutine;
 
     private void Awake()
@@ -91,7 +90,6 @@ public class CombatStageManager : MonoBehaviour
         if (heroGoblin != null)
         {
             initialHeroPos = heroGoblin.localPosition;
-            heroInitialWorldPos = heroGoblin.position; // 월드 기준 초기 시작점 기억
         }
 
         // 시작 시 아군 고블린을 연출용 무적 모드로 최초 지정
@@ -316,21 +314,35 @@ public class CombatStageManager : MonoBehaviour
         // 2. 영웅이 화면 우측 경계면 밖으로 완전 퇴장하는 모습을 2.5초간 대기 감상
         yield return new WaitForSeconds(2.5f);
 
-        // 3. [좌표 및 상태 초기화 리셋]
+        // 3. [중앙 위치 초기화] 
+        // 카메라 추적 버그를 막기 위해 아직 currentMode는 Transition(락 상태)을 유지합니다.
         if (heroUnit != null)
         {
-            heroUnit.ResetToInitialPosition(heroInitialWorldPos);
-        }
+            // 영웅의 행동 제어를 풀고, 캔버스 부모판의 정중앙(0,0)으로 강제 순간이동 (Vector3.zero 전달 시 내부에서 anchoredPosition.zero 적용)
+            heroUnit.ResetToInitialPosition(Vector3.zero); 
 
-        // 배경판 앵커 좌표도 전장 초기 한가운데 위치로 강제 원복 리셋
+            RectTransform heroRect = heroGoblin.GetComponent<RectTransform>();
+            if (heroRect != null)
+            {
+                heroRect.anchoredPosition = Vector2.zero; 
+            }
+        }
+        
+        // 배경 마당판도 정중앙(0,0)으로 강제 순간이동시켜 영웅과 카메라 시점을 중앙에 일치시킵니다.
         if (combatFieldContext != null)
         {
-            combatFieldContext.anchoredPosition = initialFieldPos;
+            combatFieldContext.anchoredPosition = Vector2.zero;
         }
 
         // 스테이지 카운트 증가 돌파
         currentStage++;
-        Debug.Log($"[시스템] {currentStage} 스테이지 돌파 완료! 일반 방치 모드로 복귀합니다.");
+        Debug.Log($"[시스템] 새 스테이지 {currentStage} 맵 중앙 배치 완료. 환경 정비를 위해 1초간 대기합니다.");
+
+        // 4. [스폰 킬 방지 리스크 케어] 
+        // 유저가 새 스테이지 시작을 인지할 수 있도록 1초간 정적 상태를 유지 (이동/스폰 모두 대기)
+        yield return new WaitForSeconds(1.0f);
+
+        Debug.Log("[시스템] 전투를 재개합니다.");
 
         // 다시 히어로를 연출 무적화 상태로 셋업하고 방치 파밍 모드로 복구
         SetHeroDecorationMode(true);

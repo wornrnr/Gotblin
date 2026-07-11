@@ -21,6 +21,9 @@ public class BaseCombatUnit : MonoBehaviour
     [Tooltip("이 유닛이 스테이지 보스인지 여부입니다. 인스펙터에서 보스 프리팹은 체크해 주세요.")]
     public bool isBoss;
 
+    [Tooltip("유닛 고유의 덩치 크기(충돌 반경) 최소 대치 거리입니다. (일반몹: 50, 보스: 120 권장)")]
+    public float bodyRadius = 50f;
+
     [Tooltip("전투 진행 중 사망이나 체력 차감이 일어나지 않는 가짜 연출 전용 유닛인지 여부입니다.")]
     public bool isDecorationMode = false;
 
@@ -57,6 +60,12 @@ public class BaseCombatUnit : MonoBehaviour
     // 보스 처치 후 오른쪽 퇴장 걷기 연출 작동 제어용 플래그
     private bool isVictoryWalking = false;
 
+    // [타격감 연출] 피격 이펙트 제어용 멤버 변수군
+    private Coroutine hitEffectCoroutine;
+    private Color originalColor = Color.white;
+    private Vector3 originalScale = Vector3.one;
+    private UnityEngine.UI.Image unitImage; // 스프라이트 컬러 변경용 (Image 컴포넌트)
+
     /// <summary>
     /// 보스 퇴치 후 영웅에게 전방위 AI를 종료하고 강제로 우측 화면 퇴장 명령을 내립니다.
     /// </summary>
@@ -67,11 +76,27 @@ public class BaseCombatUnit : MonoBehaviour
 
     /// <summary>
     /// 퇴장이 완료된 영웅을 초기 전장 시작 지점으로 복귀 및 체력 완충 리셋시킵니다.
+    /// Vector3.zero(또는 zero 벡터)가 주어지면 UGUI 로컬 anchoredPosition 기준으로 Vector2.zero를 직접 대입합니다.
     /// </summary>
-    public void ResetToInitialPosition(Vector3 initialWorldPos)
+    public void ResetToInitialPosition(Vector3 destination)
     {
         isVictoryWalking = false;
-        transform.position = initialWorldPos;
+
+        if (rectTransform == null)
+        {
+            rectTransform = GetComponent<RectTransform>();
+        }
+
+        if (destination == Vector3.zero && rectTransform != null)
+        {
+            // Vector3.zero가 주어질 경우, UGUI 로컬 좌표계인 anchoredPosition 기준으로 Vector2.zero를 직접 주입
+            rectTransform.anchoredPosition = Vector2.zero;
+        }
+        else
+        {
+            transform.position = destination;
+        }
+
         currentHP = maxHP;
         currentState = UnitState.Idle;
     }
@@ -100,6 +125,14 @@ public class BaseCombatUnit : MonoBehaviour
         // 체력 최댓값 복구 및 대기 상태 셋업
         currentHP = maxHP;
         currentState = UnitState.Idle;
+
+        // [타격감 연출] 초기값 획득 및 백업
+        unitImage = GetComponent<UnityEngine.UI.Image>();
+        if (unitImage != null)
+        {
+            originalColor = unitImage.color;
+        }
+        originalScale = transform.localScale;
 
         // [포위망 산개 연출]: 사거리(attackRange)의 80% 반경 내에서 2D 무작위 위치를 지정하여 겹침 방지
         Vector2 randomPos = Random.insideUnitCircle * (attackRange * 0.8f);
@@ -203,17 +236,22 @@ public class BaseCombatUnit : MonoBehaviour
             // [부모 계층 좌표 불일치 해결] 두 유닛의 캔버스 상 부모가 달라도 정확히 거리를 잴 수 있도록 월드 공간 거리 측정
             // [포위망 오프셋 반영]: 타겟의 정중앙이 아닌, 타겟 주변의 고유 포위 목표 좌표를 최종 목적지로 계산
             Vector3 targetDest = currentTarget.transform.position + attackPositionOffset;
-            float distance = Vector3.Distance(transform.position, targetDest);
+            
+            float targetRadius = currentTarget.bodyRadius;
+            float minKeepDistance = this.bodyRadius + targetRadius;
+            
+            // 타겟 중심과의 절대 월드 거리 측정
+            float distanceToTargetCenter = Vector3.Distance(transform.position, currentTarget.transform.position);
 
-            // 오프셋 목적지 기준 15픽셀 내 도달 시 멈춰 서서 공격 가동
-            if (distance > 15f)
+            // [사거리 & 덩치 겹침 방지 결합]: 최소 필수 대치 간격보다 멀고, 사정거리(attackRange)보다도 멀 때만 추적(Chasing)합니다.
+            if (distanceToTargetCenter > minKeepDistance && distanceToTargetCenter > attackRange)
             {
-                // 공격 사정거리보다 멀리 있으면 추적 상태
+                // 아직 사거리 밖이고 목적지에도 도달하지 못했다면 추적 상태
                 currentState = UnitState.Chasing;
             }
             else
             {
-                // 공격 사정거리 이내에 진입하면 공격 대기 상태
+                // 덩치 경계선에 닿았거나 사거리 내 진입했다면 대치 및 공격 상태(Attacking)로 돌입 (제자리 정지)
                 currentState = UnitState.Attacking;
             }
         }
@@ -237,30 +275,42 @@ public class BaseCombatUnit : MonoBehaviour
     }
 
     /// <summary>
-    /// 타겟 주변의 포위망 오프셋 목표 지점을 향해 X, Y축 전방위 입체 질주를 수행합니다. (Z축 뒤틀림 방어 내장)
+    /// 상대방의 덩치 반경(bodyRadius)과 포위 오프셋을 종합하여, 겹치지 않는 경계선 목적지까지만 전방위 입체 질주를 수행합니다.
     /// </summary>
     private void MoveTowardsTarget()
     {
         if (currentTarget == null) return;
 
+        float targetRadius = currentTarget.bodyRadius;
+        float minKeepDistance = this.bodyRadius + targetRadius;
+
         Vector3 myPos = transform.position;
-        // 타겟 중심 좌표에 고유의 포위 오프셋을 더한 최종 목적지 좌표 구동
-        Vector3 targetDest = currentTarget.transform.position + attackPositionOffset;
+        Vector3 targetPos = currentTarget.transform.position;
 
-        // [부모 계층 좌표 불일치 해결] 월드 포지션 기준 사방 정규화 벡터 계산
-        Vector2 direction = ((Vector2)(targetDest - myPos)).normalized;
+        // 상대방과의 겹침 최소 거리에 산개 오프셋을 더한 안전 목적지(destination) 산출
+        Vector3 offsetDir = attackPositionOffset != Vector3.zero ? attackPositionOffset.normalized : (myPos - targetPos).normalized;
+        Vector3 destination = targetPos + (offsetDir * minKeepDistance);
 
-        // 월드 좌표계를 기준으로 직접 이동을 적용하되, Z축 뒤틀림으로 인한 UI 렌더링 꼬임을 완전히 방지
-        Vector3 nextPos = transform.position + (Vector3)(direction * moveSpeed * Time.deltaTime);
-        nextPos.z = 0f; // Z축 강제 고정
-        transform.position = nextPos;
+        // 내 현재 위치에서 안전 목적지까지의 방향 지향 벡터
+        Vector3 moveDir = (destination - myPos);
+        moveDir.z = 0; // Z축 고정
 
-        // X축 이동 방향 기준 스프라이트 localScale 좌우 반전 플립 처리
-        if (direction.x != 0f)
+        if (moveDir.sqrMagnitude > 1f)
         {
-            Vector3 scale = transform.localScale;
-            scale.x = Mathf.Abs(scale.x) * (direction.x > 0f ? 1f : -1f);
-            transform.localScale = scale;
+            Vector3 direction = moveDir.normalized;
+
+            // 월드 좌표계를 기준으로 안전 범위까지만 이동
+            Vector3 nextPos = transform.position + (Vector3)(direction * moveSpeed * Time.deltaTime);
+            nextPos.z = 0f; // Z축 렌더링 순서 보장
+            transform.position = nextPos;
+
+            // X축 이동 방향 기준 스프라이트 localScale 좌우 반전 플립 처리
+            if (direction.x != 0f)
+            {
+                Vector3 scale = transform.localScale;
+                scale.x = Mathf.Abs(scale.x) * (direction.x > 0f ? 1f : -1f);
+                transform.localScale = scale;
+            }
         }
     }
 
@@ -276,14 +326,17 @@ public class BaseCombatUnit : MonoBehaviour
         {
             attackTimer = 0f;
             Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 적 <color=red>{currentTarget.gameObject.name}</color>을(를) 타격! (피해량: {attackDamage})");
-            currentTarget.TakeDamage(attackDamage);
+            // [호출부 연동] 공격력과 함께 공격자 자신의 절대 월드 위치(transform.position)를 전달
+            currentTarget.TakeDamage(attackDamage, transform.position);
         }
     }
 
     /// <summary>
-    /// 외부로부터 공격 피해를 수신하여 체력을 감소시킵니다.
+    /// 외부로부터 공격 피해를 수신하여 체력을 감소시킵니다. (피격 넉백 연출 포함)
     /// </summary>
-    public void TakeDamage(int amount)
+    /// <param name="amount">데미지량</param>
+    /// <param name="attackerPosition">나를 가격한 상대방의 위치 좌표</param>
+    public void TakeDamage(int amount, Vector3 attackerPosition)
     {
         if (currentState == UnitState.Dead) return;
 
@@ -299,7 +352,67 @@ public class BaseCombatUnit : MonoBehaviour
         if (currentHP <= 0)
         {
             Die();
+            return;
         }
+
+        // [타격감 연출 추가] 생존해 있다면 3종 피격 피드백 실행
+        if (hitEffectCoroutine != null)
+        {
+            StopCoroutine(hitEffectCoroutine);
+            // 연속 피격 시 스케일이나 컬러가 누적되어 꼬이지 않도록 원상복구 후 재시작
+            transform.localScale = originalScale;
+            if (unitImage != null) unitImage.color = originalColor;
+        }
+
+        hitEffectCoroutine = StartCoroutine(HitFeedbackSequence(attackerPosition));
+    }
+
+    /// <summary>
+    /// 피격 3종 피드백 (0.15초 붉은 플래시, 스케일 움찔 펄스, 탄성 넉백 복원) 코루틴입니다.
+    /// </summary>
+    private System.Collections.IEnumerator HitFeedbackSequence(Vector3 attackerPos)
+    {
+        if (unitImage == null) unitImage = GetComponent<UnityEngine.UI.Image>();
+
+        float duration = 0.15f; // 연출 시간
+        float elapsed = 0f;
+
+        // 1. 피격 컬러 붉은색 플래시 시작
+        if (unitImage != null)
+        {
+            unitImage.color = new Color(1f, 0.3f, 0.3f, 1f);
+        }
+
+        Vector3 startPosition = transform.position;
+        Vector3 knockbackDirection = (transform.position - attackerPos).normalized;
+        knockbackDirection.z = 0;
+
+        float knockbackDist = 20f; // 넉백될 최대 픽셀 거리
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float percent = elapsed / duration;
+
+            // 1) 움찔 스케일 연출: Sin 곡선을 타며 1.0 ➡️ 1.15 ➡️ 1.0 복귀
+            float scaleCurve = Mathf.Sin(percent * Mathf.PI);
+            transform.localScale = originalScale * (1f + (scaleCurve * 0.15f));
+
+            // 2) 탄성 넉백 연출: 밀렸다가 다시 원위치(startPosition)로 돌아오는 탄성 운동
+            float motionCurve = Mathf.Sin(percent * Mathf.PI);
+            transform.position = startPosition + (knockbackDirection * knockbackDist * motionCurve);
+
+            yield return null;
+        }
+
+        // 연출 시간 완료 후 최종 복원
+        transform.localScale = originalScale;
+        transform.position = startPosition;
+        if (unitImage != null)
+        {
+            unitImage.color = originalColor;
+        }
+        hitEffectCoroutine = null;
     }
 
     /// <summary>
