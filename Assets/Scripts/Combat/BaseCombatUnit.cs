@@ -259,6 +259,17 @@ public class BaseCombatUnit : MonoBehaviour
             attackPositionOffset = new Vector3(randomPos.x, randomPos.y, 0f);
         }
 
+        // [모듈형 비주얼 뒤집기 연동] 적이 내 왼쪽에 있다면 왼쪽을 바라보고, 오른쪽에 있다면 오른쪽을 바라봄
+        if (currentTarget != null)
+        {
+            HeroVisualController visualController = GetComponent<HeroVisualController>();
+            if (visualController != null)
+            {
+                bool isTargetLeft = currentTarget.transform.position.x < transform.position.x;
+                visualController.SetFacingDirection(isTargetLeft);
+            }
+        }
+
         // 3. FSM 상태 전이 판단 (실시간 예외/무결성 Null Check 포함)
         if (currentTarget == null || currentTarget.IsDead())
         {
@@ -338,8 +349,8 @@ public class BaseCombatUnit : MonoBehaviour
             nextPos.z = 0f; // Z축 렌더링 순서 보장
             transform.position = nextPos;
 
-            // X축 이동 방향 기준 스프라이트 localScale 좌우 반전 플립 처리
-            if (direction.x != 0f)
+            // X축 이동 방향 기준 스프라이트 localScale 좌우 반전 플립 처리 (모듈형 비주얼 컨트롤러가 없는 유닛만 개별 가동)
+            if (direction.x != 0f && GetComponent<HeroVisualController>() == null)
             {
                 Vector3 scale = transform.localScale;
                 scale.x = Mathf.Abs(scale.x) * (direction.x > 0f ? 1f : -1f);
