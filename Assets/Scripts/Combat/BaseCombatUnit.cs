@@ -60,6 +60,9 @@ public class BaseCombatUnit : MonoBehaviour
     // 보스 처치 후 오른쪽 퇴장 걷기 연출 작동 제어용 플래그
     private bool isVictoryWalking = false;
 
+    // [애니메이션 동기화용] 비주얼 컨트롤러 캐시
+    private HeroVisualController visualController;
+
     // [타격감 연출] 피격 이펙트 제어용 멤버 변수군
     private Coroutine hitEffectCoroutine;
     private Color originalColor = Color.white;
@@ -150,11 +153,12 @@ public class BaseCombatUnit : MonoBehaviour
 
     private void Start()
     {
-        // 1. 자신의 RectTransform 레퍼런스 확정 획득
+        // 1. 자신의 RectTransform 및 VisualController 레퍼런스 확정 획득
         if (rectTransform == null)
         {
             rectTransform = GetComponent<RectTransform>();
         }
+        visualController = GetComponent<HeroVisualController>();
 
         // 체력 최댓값 복구 및 대기 상태 셋업
         currentHP = maxHP;
@@ -317,6 +321,13 @@ public class BaseCombatUnit : MonoBehaviour
                 ExecuteAttackLogic();
                 break;
         }
+
+        // 5. [애니메이션 동기화] 이동 중인지 여부를 visualController에 실시간 전달
+        if (visualController != null)
+        {
+            bool isMovingNow = (currentState == UnitState.Chasing || isVictoryWalking);
+            visualController.SetMoveAnimation(isMovingNow);
+        }
     }
 
     /// <summary>
@@ -371,6 +382,13 @@ public class BaseCombatUnit : MonoBehaviour
         {
             attackTimer = 0f;
             Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 적 <color=red>{currentTarget.gameObject.name}</color>을(를) 타격! (피해량: {attackDamage})");
+            
+            // [애니메이션 동기화] 무기를 휘두르는 타격 발생 순간 Attack 트리거 가동
+            if (visualController != null)
+            {
+                visualController.TriggerAttackAnimation();
+            }
+
             // [호출부 연동] 공격력과 함께 공격자 자신의 절대 월드 위치(transform.position)를 전달
             currentTarget.TakeDamage(attackDamage, transform.position);
         }
