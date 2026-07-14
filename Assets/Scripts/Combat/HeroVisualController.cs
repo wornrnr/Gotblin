@@ -21,9 +21,11 @@ public class HeroVisualController : MonoBehaviour
     private Image weaponImage;
     private Animator animator;
 
-    // 애니메이터 내부 파라미터 존재 여부 안전 검사용 플래그
+    // 애니메이터 내부 파라미터 존재 여부 안전 검사용 플래그 및 파라미터명 저장
     private bool hasIsMovingParam = false;
     private bool hasAttackParam = false;
+    private string movingParamName = "isMoving";
+    private string attackParamName = "Attack";
 
     private void Awake()
     {
@@ -61,8 +63,16 @@ public class HeroVisualController : MonoBehaviour
             hasAttackParam = false;
             foreach (AnimatorControllerParameter param in animator.parameters)
             {
-                if (param.name == "isMoving") hasIsMovingParam = true;
-                if (param.name == "Attack") hasAttackParam = true;
+                if (string.Equals(param.name, "isMoving", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    hasIsMovingParam = true;
+                    movingParamName = param.name;
+                }
+                if (string.Equals(param.name, "Attack", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    hasAttackParam = true;
+                    attackParamName = param.name;
+                }
             }
         }
     }
@@ -78,7 +88,7 @@ public class HeroVisualController : MonoBehaviour
     }
 
     /// <summary>
-    /// 이동 애니메이션 상태를 조율합니다 (isMoving 파라미터).
+    /// 이동 애니메이션 상태를 조율합니다 (isMoving / IsMoving 파라미터).
     /// </summary>
     public void SetMoveAnimation(bool isMoving)
     {
@@ -87,7 +97,7 @@ public class HeroVisualController : MonoBehaviour
         // 파라미터가 실제 애니메이터에 등록되어 있을 때만 에러 없이 안전하게 호출
         if (animator != null && hasIsMovingParam)
         {
-            animator.SetBool("isMoving", isMoving);
+            animator.SetBool(movingParamName, isMoving);
         }
     }
 
@@ -101,7 +111,7 @@ public class HeroVisualController : MonoBehaviour
         // 파라미터가 실제 애니메이터에 등록되어 있을 때만 에러 없이 안전하게 호출
         if (animator != null && hasAttackParam)
         {
-            animator.SetTrigger("Attack");
+            animator.SetTrigger(attackParamName);
             Debug.Log("<color=yellow>[HeroVisualController] Attack 트리거가 정상 가동되었습니다!</color>");
         }
     }
