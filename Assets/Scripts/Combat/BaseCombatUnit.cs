@@ -43,6 +43,9 @@ public class BaseCombatUnit : MonoBehaviour
     [Tooltip("공격을 한 번 수행한 뒤 다시 수행하기까지 대기할 쿨타임 주기(초 단위)입니다.")]
     public float attackCooldown = 1.2f;
 
+    [Tooltip("공격 모션 발동 후 실제 무기가 휘둘러져 타격이 들어가는 지연 시간(초 단위)입니다.")]
+    public float attackHitDelay = 0.25f;
+
     [Tooltip("타겟을 추적할 때 적용될 평면 질주 속도입니다.")]
     public float moveSpeed = 100f;
 
@@ -109,6 +112,12 @@ public class BaseCombatUnit : MonoBehaviour
         }
 
         currentState = UnitState.Idle;
+
+        // [전역 타겟팅 연동 재등록]
+        if (CombatManager.Instance != null)
+        {
+            CombatManager.Instance.RegisterUnit(this);
+        }
     }
 
     /// <summary>
@@ -136,6 +145,12 @@ public class BaseCombatUnit : MonoBehaviour
 
         currentHP = maxHP;
         currentState = UnitState.Idle;
+
+        // [전역 타겟팅 연동 재등록]: 사망 등으로 풀에서 언레지스터되었던 유닛을 다시 CombatManager 리스트에 등록
+        if (CombatManager.Instance != null)
+        {
+            CombatManager.Instance.RegisterUnit(this);
+        }
     }
 
     // 외부 연동 및 상대 픽셀 거리 측정을 위한 RectTransform 노출 프로퍼티
@@ -249,18 +264,22 @@ public class BaseCombatUnit : MonoBehaviour
             return;
         }
 
-        // 2. 실시간 최단 거리 적 검색 (개선된 싱글 아규먼트 API 연동)
-        BaseCombatUnit previousTarget = currentTarget;
-        if (CombatManager.Instance != null)
+        // 2. 적 탐색 (현재 타겟이 없거나 이미 처치된 경우에만 새로운 최단 거리 적 검색)
+        if (currentTarget == null || currentTarget.IsDead() || !currentTarget.gameObject.activeInHierarchy)
         {
-            currentTarget = CombatManager.Instance.GetClosestTarget(this);
-        }
+            BaseCombatUnit previousTarget = currentTarget;
+            if (CombatManager.Instance != null)
+            {
+                currentTarget = CombatManager.Instance.GetClosestTarget(this);
+            }
 
-        // [동적 오프셋 갱신]: 새로운 적인 타겟으로 변경될 때마다 타겟 주변 360도 방향 무작위 오프셋 재할당
-        if (currentTarget != previousTarget && currentTarget != null)
-        {
-            Vector2 randomPos = Random.insideUnitCircle * (attackRange * 0.8f);
-            attackPositionOffset = new Vector3(randomPos.x, randomPos.y, 0f);
+            // [동적 오프셋 갱신 및 쿨타임 초기화]: 새로운 적인 타겟으로 변경될 때마다 오프셋 할당 및 공격 타이머 리셋
+            if (currentTarget != previousTarget && currentTarget != null)
+            {
+                Vector2 randomPos = Random.insideUnitCircle * (attackRange * 0.8f);
+                attackPositionOffset = new Vector3(randomPos.x, randomPos.y, 0f);
+                attackTimer = 0f;
+            }
         }
 
         // [모듈형 비주얼 뒤집기 연동] 적이 내 왼쪽에 있다면 왼쪽을 바라보고, 오른쪽에 있다면 오른쪽을 바라봄
@@ -279,6 +298,7 @@ public class BaseCombatUnit : MonoBehaviour
         {
             currentState = UnitState.Idle;
             currentTarget = null; // 죽은 타겟 참조 정리
+            attackTimer = 0f; // 타겟 소멸 시 쿨타임 타이머 즉시 리셋
         }
         else
         {
@@ -327,6 +347,48 @@ public class BaseCombatUnit : MonoBehaviour
         {
             bool isMovingNow = (currentState == UnitState.Chasing || isVictoryWalking);
             visualController.SetMoveAnimation(isMovingNow);
+        }
+
+        // [배경 영역 범위 제한] 매 프레임 위치가 배경판 경계 바깥으로 벗어나지 않도록 고정
+        ClampPositionToBackground();
+    }
+
+    private void LateUpdate()
+    {
+        // 렌더링 최종 프레임 직전 유닛 좌표가 battleBackground 경계 영역 밖으로 벗어나는 것을 원천 차단
+        ClampPositionToBackground();
+    }
+
+    /// <summary>
+    /// 유닛의 현재 좌표가 battleBackground(배경 판) 영역 밖으로 벗어나지 않도록 강제로 경계선 내부로 제약(Clamp)합니다.
+    /// </summary>
+    public void ClampPositionToBackground()
+    {
+        if (CombatStageManager.Instance == null || CombatStageManager.Instance.battleBackground == null) return;
+
+        RectTransform bgRect = CombatStageManager.Instance.battleBackground;
+        Vector3[] corners = new Vector3[4];
+        bgRect.GetWorldCorners(corners);
+
+        // 여백(bodyRadius)을 감안하여 유닛의 중심점이 배경 판 경계를 벗어나지 않게 설정
+        float minX = corners[0].x + bodyRadius;
+        float maxX = corners[2].x - bodyRadius;
+        float minY = corners[0].y + bodyRadius;
+        float maxY = corners[1].y - bodyRadius;
+
+        if (minX > maxX) { float temp = minX; minX = maxX; maxX = temp; }
+        if (minY > maxY) { float temp = minY; minY = maxY; maxY = temp; }
+
+        Vector3 currentPos = transform.position;
+        float clampedX = Mathf.Clamp(currentPos.x, minX, maxX);
+        float clampedY = Mathf.Clamp(currentPos.y, minY, maxY);
+
+        if (currentPos.x != clampedX || currentPos.y != clampedY)
+        {
+            currentPos.x = clampedX;
+            currentPos.y = clampedY;
+            currentPos.z = 0f;
+            transform.position = currentPos;
         }
     }
 
@@ -381,7 +443,6 @@ public class BaseCombatUnit : MonoBehaviour
         if (attackTimer >= attackCooldown)
         {
             attackTimer = 0f;
-            Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 적 <color=red>{currentTarget.gameObject.name}</color>을(를) 타격! (피해량: {attackDamage})");
             
             // [애니메이션 동기화] 무기를 휘두르는 타격 발생 순간 Attack 트리거 가동
             if (visualController != null)
@@ -389,8 +450,26 @@ public class BaseCombatUnit : MonoBehaviour
                 visualController.TriggerAttackAnimation();
             }
 
-            // [호출부 연동] 공격력과 함께 공격자 자신의 절대 월드 위치(transform.position)를 전달
-            currentTarget.TakeDamage(attackDamage, transform.position);
+            // [타격 시점 동기화] attackHitDelay(기본 0.25초) 지연 후 무기가 적에게 맞는 타이밍에 TakeDamage 수신
+            StartCoroutine(PerformDelayedDamage(currentTarget, attackDamage, attackHitDelay));
+        }
+    }
+
+    /// <summary>
+    /// 무기 모션 궤적(휘두르는 프레임) 타이밍에 맞춰 타격 피해를 전달하는 지연 코루틴입니다.
+    /// </summary>
+    private System.Collections.IEnumerator PerformDelayedDamage(BaseCombatUnit target, int damage, float delay)
+    {
+        if (delay > 0f)
+        {
+            yield return new WaitForSeconds(delay);
+        }
+
+        // 지연 시간 후 타깃과 나 자신의 상태 무결성 검증 (사망, 파괴, 사망한 적 예방)
+        if (target != null && !target.IsDead() && !IsDead() && currentState != UnitState.Dead)
+        {
+            Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 적 <color=red>{target.gameObject.name}</color>을(를) 휘둘러 타격! (피해량: {damage})");
+            target.TakeDamage(damage, transform.position);
         }
     }
 
@@ -412,6 +491,13 @@ public class BaseCombatUnit : MonoBehaviour
         currentHP = Mathf.Max(0, currentHP - amount);
         Debug.Log($"[{gameObject.name}] 피격 발생! (-{amount} HP) / 현재 체력: {currentHP}/{maxHP}");
 
+        // [피해량 텍스트 연출 트리거]: 내가 적(isEnemy=true)이면 공격자는 히어로(isHeroAttacking=true), 내가 히어로이면 공격자는 적(isHeroAttacking=false)
+        if (DamageTextManager.Instance != null)
+        {
+            bool isHeroAttacking = isEnemy; // 피격자가 적이면 타격한 주체는 히어로 고블린
+            DamageTextManager.Instance.ShowDamageText(amount, isHeroAttacking, transform.position);
+        }
+
         if (currentHP <= 0)
         {
             Die();
@@ -422,8 +508,7 @@ public class BaseCombatUnit : MonoBehaviour
         if (hitEffectCoroutine != null)
         {
             StopCoroutine(hitEffectCoroutine);
-            // 연속 피격 시 스케일이나 컬러가 누적되어 꼬이지 않도록 원상복구 후 재시작
-            transform.localScale = originalScale;
+            // 연속 피격 시 컬러가 누적되어 꼬이지 않도록 원상복구 후 재시작
             if (unitImage != null) unitImage.color = originalColor;
         }
 
@@ -447,6 +532,7 @@ public class BaseCombatUnit : MonoBehaviour
         }
 
         Vector3 startPosition = transform.position;
+        Vector3 currentScale = transform.localScale; // 피격 발생 직전 유닛이 바라보던 localScale 방향 기억
         Vector3 knockbackDirection = (transform.position - attackerPos).normalized;
         knockbackDirection.z = 0;
 
@@ -477,9 +563,9 @@ public class BaseCombatUnit : MonoBehaviour
             elapsed += Time.deltaTime;
             float percent = elapsed / duration;
 
-            // 1) 움찔 스케일 연출: Sin 곡선을 타며 1.0 ➡️ 1.15 ➡️ 1.0 복귀
+            // 1) 움찔 스케일 연출: Sin 곡선을 타며 현재 바라보던 방향 스케일(currentScale) 부호를 보존하며 펄스
             float scaleCurve = Mathf.Sin(percent * Mathf.PI);
-            transform.localScale = originalScale * (1f + (scaleCurve * 0.15f));
+            transform.localScale = currentScale * (1f + (scaleCurve * 0.15f));
 
             // 2) 탄성 넉백 연출: 밀렸다가 다시 원위치(startPosition)로 돌아오는 탄성 운동
             float motionCurve = Mathf.Sin(percent * Mathf.PI);
@@ -494,8 +580,8 @@ public class BaseCombatUnit : MonoBehaviour
             yield return null;
         }
 
-        // 연출 시간 완료 후 최종 복원
-        transform.localScale = originalScale;
+        // 연출 시간 완료 후 피격 직전 바라보던 부호 방향(currentScale)으로 최종 복원
+        transform.localScale = currentScale;
         transform.position = startPosition;
         if (unitImage != null)
         {
@@ -540,10 +626,25 @@ public class BaseCombatUnit : MonoBehaviour
                 Destroy(gameObject);
             }
         }
+        else if (isEnemy && isBoss)
+        {
+            // 보스 몬스터는 기존 방식대로 씬에서 완전 파괴(Destroy) 처리
+            Destroy(gameObject);
+        }
         else
         {
-            // 아군 고블린 및 보스 몬스터는 기존 방식대로 씬에서 완전 파괴(Destroy) 처리
-            Destroy(gameObject);
+            // [아군 히어로 고블린 (!isEnemy)]: 현재 전투 모드(ChallengeMode vs IdleMode)를 식별하여 올바른 패배/재시작 시퀀스 호출
+            if (CombatStageManager.Instance != null)
+            {
+                if (CombatStageManager.Instance.currentMode == CombatMode.ChallengeMode)
+                {
+                    CombatStageManager.Instance.EndChallenge(false);
+                }
+                else
+                {
+                    CombatStageManager.Instance.OnHeroDiedInIdleMode();
+                }
+            }
         }
     }
 

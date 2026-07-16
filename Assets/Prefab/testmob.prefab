@@ -66,7 +66,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ea5c4fc418c71491eb063b759868a2a1, type: 3}
+  m_Sprite: {fileID: -2082954526221052654, guid: 951431b1c5a11364dafe6ef12bafec87, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -90,12 +90,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   isEnemy: 1
   isBoss: 0
-  bodyRadius: 50
+  bodyRadius: 100
   isDecorationMode: 1
   maxHP: 100
   currentHP: 0
   attackDamage: 10
   attackRange: 1
   attackCooldown: 1.2
+  attackHitDelay: 0.25
   moveSpeed: 100
   currentState: 0

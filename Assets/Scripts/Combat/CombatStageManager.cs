@@ -92,8 +92,8 @@ public class CombatStageManager : MonoBehaviour
             initialHeroPos = heroGoblin.localPosition;
         }
 
-        // 시작 시 아군 고블린을 연출용 무적 모드로 최초 지정
-        SetHeroDecorationMode(true);
+        // 첫 스테이지 방치 파밍 모드 시작 시 아군 고블린의 무적 연출 모드 해제 (적 공격 및 체력 감속 정상 적용)
+        SetHeroDecorationMode(false);
     }
 
     private void Update()
@@ -394,11 +394,81 @@ public class CombatStageManager : MonoBehaviour
         BaseCombatUnit heroUnit = heroGoblin != null ? heroGoblin.GetComponent<BaseCombatUnit>() : null;
         if (heroUnit != null)
         {
-            heroUnit.isDecorationMode = false;
+            heroUnit.ResetToInitialPosition(initialHeroPos);
+            if (CombatManager.Instance != null)
+            {
+                CombatManager.Instance.RegisterUnit(heroUnit);
+            }
         }
 
+        SetHeroDecorationMode(false);
         currentMode = CombatMode.IdleMode;
         Debug.Log($"[CombatStageManager] FailSequence 연출 코루틴이 무사히 완료되어 파밍 모드로 복귀했습니다. (현재 모드: {currentMode})");
+    }
+
+    /// <summary>
+    /// 방치 파밍 모드(IdleMode) 진행 중 아군 히어로 고블린이 사망할 경우, 
+    /// 진행 중이던 스테이지를 다시 시작합니다 (적 일괄 소거, 정중앙 풀체력 재배치, 방치 모드 재개).
+    /// </summary>
+    public void OnHeroDiedInIdleMode()
+    {
+        if (currentMode == CombatMode.Transition) return;
+
+        currentMode = CombatMode.Transition;
+        Debug.Log("<color=red><b>[CombatStageManager] 방치 모드 중 히어로 사망 발생! 스테이지를 재시작합니다.</b></color>");
+
+        if (activeTransitionCoroutine != null)
+        {
+            StopCoroutine(activeTransitionCoroutine);
+        }
+        activeTransitionCoroutine = StartCoroutine(RestartStageSequence());
+    }
+
+    /// <summary>
+    /// 방치 모드 스테이지 재시작 시퀀스: 생성된 모든 적 소거 ➡️ 히어로 및 카메라인 정중앙 순간이동 및 체력 완충 ➡️ 1초 대기 후 파밍 재개
+    /// </summary>
+    private IEnumerator RestartStageSequence()
+    {
+        // 1. 전장에 남아있는 모든 적 잔당 일괄 삭제 소거
+        if (EnemySpawner.Instance != null)
+        {
+            EnemySpawner.Instance.ClearAllActiveEnemies();
+        }
+
+        // 연출 도중 추가 체력 차감을 막기 위해 일시 무적화
+        SetHeroDecorationMode(true);
+
+        // 2. 히어로 고블린 및 배경 카메라 정중앙 위치 초기화 및 HP 완충
+        BaseCombatUnit heroUnit = heroGoblin != null ? heroGoblin.GetComponent<BaseCombatUnit>() : null;
+        if (heroUnit != null)
+        {
+            heroUnit.ResetToInitialPosition(Vector3.zero);
+            RectTransform heroRect = heroGoblin.GetComponent<RectTransform>();
+            if (heroRect != null)
+            {
+                heroRect.anchoredPosition = Vector2.zero;
+            }
+
+            // [전역 타겟팅 연동 이중 보장]: CombatManager에 히어로 유닛 확정 재등록
+            if (CombatManager.Instance != null)
+            {
+                CombatManager.Instance.RegisterUnit(heroUnit);
+            }
+        }
+
+        if (combatFieldContext != null)
+        {
+            combatFieldContext.anchoredPosition = Vector2.zero;
+        }
+
+        // 3. 환경 정비를 위한 1초 정적 대기
+        yield return new WaitForSeconds(1.0f);
+
+        Debug.Log("<color=green><b>[CombatStageManager] 스테이지 재시작 완료! 방치 파밍 전투를 다시 개시합니다.</b></color>");
+
+        // 원래의 방치 모드 무적 해제 및 전투 진행 복구
+        SetHeroDecorationMode(false);
+        currentMode = CombatMode.IdleMode;
     }
 
     /// <summary>
