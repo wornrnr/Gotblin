@@ -17,6 +17,9 @@ public class MainScreenManager : MonoBehaviour
     [Tooltip("코어 2: 부락 건설 및 관리 화면의 부모 GameObject 패널입니다.")]
     [SerializeField] private GameObject townBuildingPanel;
 
+    [Tooltip("코어 3: 자동 전투 시스템 화면의 부모 GameObject 패널입니다.")]
+    [SerializeField] private GameObject combatPanel;
+
     private void Awake()
     {
         // 싱글톤 이니셜라이즈
@@ -32,11 +35,12 @@ public class MainScreenManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 그래프 게임 패널을 켜고 부락 건설 패널을 비활성화합니다.
+    /// 그래프 게임 패널을 켜고 부락 건설 및 전투 패널을 비활성화합니다.
     /// </summary>
     public void SwitchToGraphGame()
     {
         if (townBuildingPanel != null) townBuildingPanel.SetActive(false);
+        if (combatPanel != null) combatPanel.SetActive(false);
         if (graphGamePanel != null) graphGamePanel.SetActive(true);
 
         Debug.Log("[MainScreenManager] [코어 1: 그래프 게임] 패널 활성화 완료.");
@@ -48,6 +52,7 @@ public class MainScreenManager : MonoBehaviour
     public void SwitchToTownBuilding()
     {
         if (graphGamePanel != null) graphGamePanel.SetActive(false);
+        if (combatPanel != null) combatPanel.SetActive(false);
         if (townBuildingPanel != null)
         {
             townBuildingPanel.SetActive(true);
@@ -64,5 +69,17 @@ public class MainScreenManager : MonoBehaviour
         }
 
         Debug.Log("[MainScreenManager] [코어 2: 부락 건설] 패널 활성화 및 UI 데이터 동기화 완료.");
+    }
+
+    /// <summary>
+    /// 코어 3: 전투 시스템 패널을 켜고 그래프 게임 및 부락 건설 패널을 비활성화합니다.
+    /// </summary>
+    public void SwitchToCombatSystem()
+    {
+        if (graphGamePanel != null) graphGamePanel.SetActive(false);
+        if (townBuildingPanel != null) townBuildingPanel.SetActive(false);
+        if (combatPanel != null) combatPanel.SetActive(true);
+
+        Debug.Log("[MainScreenManager] [코어 3: 전투 시스템] 패널 활성화 완료.");
     }
 }
