@@ -55,6 +55,19 @@ public class LocalizationManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 지정한 번역 키가 현재 파싱된 딕셔너리에 존재하는지 확인합니다.
+    /// </summary>
+    public bool HasKey(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return false;
+        if (localizedDictionary == null || localizedDictionary.Count == 0)
+        {
+            LoadLocalizationTable();
+        }
+        return localizedDictionary != null && localizedDictionary.ContainsKey(key);
+    }
+
+    /// <summary>
     /// 외부에서 번역 요청을 할 때 호출하는 핵심 메서드입니다.
     /// </summary>
     /// <param name="key">번역 키값 (예: ui_start_btn)</param>
@@ -62,6 +75,11 @@ public class LocalizationManager : MonoBehaviour
     public string GetLocalizedString(string key)
     {
         if (string.IsNullOrEmpty(key)) return string.Empty;
+
+        if (localizedDictionary == null || localizedDictionary.Count == 0)
+        {
+            LoadLocalizationTable();
+        }
 
         if (localizedDictionary != null && localizedDictionary.TryGetValue(key, out string translatedText))
         {

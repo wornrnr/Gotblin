@@ -26,6 +26,12 @@ public class CombatStageManager : MonoBehaviour
     [Tooltip("현재 돌파 중인 스테이지 번호입니다.")]
     public int currentStage = 1;
 
+    [Tooltip("챕터가 변경되는 기준 스테이지 단위 수치입니다. (기본: 20, 30/50 등 가변 가능)")]
+    public int stagesPerChapter = 20;
+
+    [Tooltip("전투 패널 상단 스테이지 및 챕터 표시 UI 레퍼런스입니다.")]
+    [SerializeField] private CombatStageHeaderUI stageHeaderUI;
+
     [Header("전투 구역 공간 및 아군 레퍼런스")]
     [Tooltip("맵 이동 시 카메라 전진 연출을 위해 직접 밀어낼 배경 공간 RectTransform입니다.")]
     [SerializeField] private RectTransform combatFieldContext;
@@ -35,6 +41,9 @@ public class CombatStageManager : MonoBehaviour
 
     [Tooltip("카메라 Clamp 범위를 연산하기 위한 배경 이미지 판 RectTransform입니다.")]
     public RectTransform battleBackground;
+
+    [Tooltip("도전 모드(보스전) 진입용 UI 버튼입니다.")]
+    [SerializeField] private GameObject challengeButton;
 
     [Header("벨트스크롤 연출 설정")]
     [Tooltip("스테이지 이동 연출 시 화면 스크롤이 진행될 시간(초)입니다.")]
@@ -72,6 +81,10 @@ public class CombatStageManager : MonoBehaviour
 
     private void Start()
     {
+        // 첫 스테이지 시작 번호 1 지정 및 상단 Header UI 동기화
+        currentStage = 1;
+        RefreshStageHeaderUI();
+
         // [디버그 방어용 레퍼런스 누락 검사]
         if (combatFieldContext == null)
         {
@@ -94,6 +107,7 @@ public class CombatStageManager : MonoBehaviour
 
         // 첫 스테이지 방치 파밍 모드 시작 시 아군 고블린의 무적 연출 모드 해제 (적 공격 및 체력 감속 정상 적용)
         SetHeroDecorationMode(false);
+        SetChallengeButtonActive(true);
     }
 
     private void Update()
@@ -165,9 +179,10 @@ public class CombatStageManager : MonoBehaviour
     /// </summary>
     public void TriggerChallengeMode()
     {
-        if (currentMode == CombatMode.Transition) return;
+        if (currentMode != CombatMode.IdleMode) return;
         
         currentMode = CombatMode.Transition;
+        SetChallengeButtonActive(false);
         
         if (activeTransitionCoroutine != null)
         {
@@ -336,6 +351,7 @@ public class CombatStageManager : MonoBehaviour
 
         // 스테이지 카운트 증가 돌파
         currentStage++;
+        RefreshStageHeaderUI();
         Debug.Log($"[시스템] 새 스테이지 {currentStage} 맵 중앙 배치 완료. 환경 정비를 위해 1초간 대기합니다.");
 
         // 4. [스폰 킬 방지 리스크 케어] 
@@ -347,6 +363,7 @@ public class CombatStageManager : MonoBehaviour
         // 다시 히어로를 연출 무적화 상태로 셋업하고 방치 파밍 모드로 복구
         SetHeroDecorationMode(true);
         currentMode = CombatMode.IdleMode;
+        SetChallengeButtonActive(true);
     }
 
     /// <summary>
@@ -403,6 +420,7 @@ public class CombatStageManager : MonoBehaviour
 
         SetHeroDecorationMode(false);
         currentMode = CombatMode.IdleMode;
+        SetChallengeButtonActive(true);
         Debug.Log($"[CombatStageManager] FailSequence 연출 코루틴이 무사히 완료되어 파밍 모드로 복귀했습니다. (현재 모드: {currentMode})");
     }
 
@@ -415,6 +433,7 @@ public class CombatStageManager : MonoBehaviour
         if (currentMode == CombatMode.Transition) return;
 
         currentMode = CombatMode.Transition;
+        SetChallengeButtonActive(false);
         Debug.Log("<color=red><b>[CombatStageManager] 방치 모드 중 히어로 사망 발생! 스테이지를 재시작합니다.</b></color>");
 
         if (activeTransitionCoroutine != null)
@@ -469,6 +488,29 @@ public class CombatStageManager : MonoBehaviour
         // 원래의 방치 모드 무적 해제 및 전투 진행 복구
         SetHeroDecorationMode(false);
         currentMode = CombatMode.IdleMode;
+        SetChallengeButtonActive(true);
+    }
+
+    /// <summary>
+    /// 도전 모드 UI 버튼의 활성화/비활성화 상태를 조절합니다.
+    /// </summary>
+    private void SetChallengeButtonActive(bool active)
+    {
+        if (challengeButton != null)
+        {
+            challengeButton.SetActive(active);
+        }
+    }
+
+    /// <summary>
+    /// 상단 스테이지 및 챕터 표시 UI(CombatStageHeaderUI)를 갱신합니다.
+    /// </summary>
+    public void RefreshStageHeaderUI()
+    {
+        if (stageHeaderUI != null)
+        {
+            stageHeaderUI.RefreshHeader(currentStage, stagesPerChapter);
+        }
     }
 
     /// <summary>

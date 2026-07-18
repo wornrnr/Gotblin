@@ -72,6 +72,31 @@ public class BaseCombatUnit : MonoBehaviour
     private Vector3 originalScale = Vector3.one;
     private UnityEngine.UI.Image unitImage; // 스프라이트 컬러 변경용 (Image 컴포넌트)
 
+    // [체력바 UI 연동용] 상단 체력바 컴포넌트 참조
+    private UnitHealthBarUI healthBarUI;
+
+    /// <summary>
+    /// 유닛 상단 체력바 UI가 존재하는지 확인하고 없으면 동적 자동 생성 및 초기화를 보장합니다.
+    /// </summary>
+    public void EnsureHealthBar()
+    {
+        if (healthBarUI == null)
+        {
+            healthBarUI = GetComponentInChildren<UnitHealthBarUI>();
+            if (healthBarUI == null)
+            {
+                GameObject go = new GameObject("HealthBarUI", typeof(RectTransform), typeof(UnitHealthBarUI));
+                go.transform.SetParent(transform, false);
+                healthBarUI = go.GetComponent<UnitHealthBarUI>();
+            }
+            healthBarUI.Init(this);
+        }
+        else
+        {
+            healthBarUI.UpdateHealthBar(currentHP, maxHP);
+        }
+    }
+
     /// <summary>
     /// 보스 퇴치 후 영웅에게 전방위 AI를 종료하고 강제로 우측 화면 퇴장 명령을 내립니다.
     /// </summary>
@@ -113,6 +138,8 @@ public class BaseCombatUnit : MonoBehaviour
 
         currentState = UnitState.Idle;
 
+        EnsureHealthBar();
+
         // [전역 타겟팅 연동 재등록]
         if (CombatManager.Instance != null)
         {
@@ -146,6 +173,8 @@ public class BaseCombatUnit : MonoBehaviour
         currentHP = maxHP;
         currentState = UnitState.Idle;
 
+        EnsureHealthBar();
+
         // [전역 타겟팅 연동 재등록]: 사망 등으로 풀에서 언레지스터되었던 유닛을 다시 CombatManager 리스트에 등록
         if (CombatManager.Instance != null)
         {
@@ -178,6 +207,9 @@ public class BaseCombatUnit : MonoBehaviour
         // 체력 최댓값 복구 및 대기 상태 셋업
         currentHP = maxHP;
         currentState = UnitState.Idle;
+
+        // [상단 체력바 UI 자동 동적 생성 및 바인딩]
+        EnsureHealthBar();
 
         // [타격감 연출] 초기값 획득 및 백업
         unitImage = GetComponent<UnityEngine.UI.Image>();
@@ -491,6 +523,9 @@ public class BaseCombatUnit : MonoBehaviour
         currentHP = Mathf.Max(0, currentHP - amount);
         Debug.Log($"[{gameObject.name}] 피격 발생! (-{amount} HP) / 현재 체력: {currentHP}/{maxHP}");
 
+        // [상단 체력바 UI 수치 동기화]
+        EnsureHealthBar();
+
         // [피해량 텍스트 연출 트리거]: 내가 적(isEnemy=true)이면 공격자는 히어로(isHeroAttacking=true), 내가 히어로이면 공격자는 적(isHeroAttacking=false)
         if (DamageTextManager.Instance != null)
         {
@@ -516,7 +551,7 @@ public class BaseCombatUnit : MonoBehaviour
     }
 
     /// <summary>
-    /// 피격 3종 피드백 (0.15초 붉은 플래시, 스케일 움찔 펄스, 탄성 넉백 복원) 코루틴입니다.
+    /// 피격 3종 피드백 (0.15초 붉은 플래시, 스케일 움찔 펄스, 유닛 넉백 복원) 코루틴입니다.
     /// </summary>
     private System.Collections.IEnumerator HitFeedbackSequence(Vector3 attackerPos)
     {
@@ -537,25 +572,14 @@ public class BaseCombatUnit : MonoBehaviour
         knockbackDirection.z = 0;
 
         float knockbackDist = 20f; // 넉백될 최대 픽셀 거리
+        Transform visualTrans = unitImage != null ? unitImage.transform : null;
+        Vector3 initialVisualLocalPos = visualTrans != null ? visualTrans.localPosition : Vector3.zero;
 
-        // [경계선 방어벽 추출]
-        float minX = float.MinValue, maxX = float.MaxValue;
-        float minY = float.MinValue, maxY = float.MaxValue;
-
-        if (CombatStageManager.Instance != null && CombatStageManager.Instance.battleBackground != null)
+        // [게이지 바 넉백 연출 미적용 보장]: 체력 게이지 바의 피격 직전 월드 위치 백업
+        Vector3 initialHealthBarWorldPos = Vector3.zero;
+        if (healthBarUI != null)
         {
-            Vector3[] bgCorners = new Vector3[4];
-            CombatStageManager.Instance.battleBackground.GetWorldCorners(bgCorners);
-            
-            // 여백(bodyRadius)을 고려하여 유닛의 중심점이 배경 밖으로 나가지 않도록 경계선 설정
-            minX = bgCorners[0].x + bodyRadius;
-            maxX = bgCorners[2].x - bodyRadius;
-            minY = bgCorners[0].y + bodyRadius;
-            maxY = bgCorners[1].y - bodyRadius;
-
-            // min/max 뒤틀림 예방 안전장치
-            if (minX > maxX) { float temp = minX; minX = maxX; maxX = temp; }
-            if (minY > maxY) { float temp = minY; minY = maxY; maxY = temp; }
+            initialHealthBarWorldPos = healthBarUI.transform.position;
         }
 
         while (elapsed < duration)
@@ -567,22 +591,41 @@ public class BaseCombatUnit : MonoBehaviour
             float scaleCurve = Mathf.Sin(percent * Mathf.PI);
             transform.localScale = currentScale * (1f + (scaleCurve * 0.15f));
 
-            // 2) 탄성 넉백 연출: 밀렸다가 다시 원위치(startPosition)로 돌아오는 탄성 운동
+            // 2) 탄성 넉백 연출: 유닛 넉백 시 상단 체력 게이지 바는 위치가 흔들리지 않도록 정위치에 고정시킵니다.
             float motionCurve = Mathf.Sin(percent * Mathf.PI);
-            Vector3 targetPosition = startPosition + (knockbackDirection * knockbackDist * motionCurve);
+            Vector3 visualOffset = knockbackDirection * knockbackDist * motionCurve;
 
-            // [기획 규칙 추가] 계산된 넉백 위치가 배경화면을 절대 뚫고 나가지 못하도록 고정
-            targetPosition.x = Mathf.Clamp(targetPosition.x, minX, maxX);
-            targetPosition.y = Mathf.Clamp(targetPosition.y, minY, maxY);
-
-            transform.position = targetPosition;
+            if (visualTrans != null && visualTrans != transform)
+            {
+                visualTrans.localPosition = initialVisualLocalPos + visualOffset;
+            }
+            else
+            {
+                transform.position = startPosition + visualOffset;
+                if (healthBarUI != null)
+                {
+                    healthBarUI.transform.position = initialHealthBarWorldPos;
+                }
+            }
 
             yield return null;
         }
 
-        // 연출 시간 완료 후 피격 직전 바라보던 부호 방향(currentScale)으로 최종 복원
+        // 연출 시간 완료 후 피격 직전 위치 및 색상으로 최종 복원
         transform.localScale = currentScale;
-        transform.position = startPosition;
+        if (visualTrans != null && visualTrans != transform)
+        {
+            visualTrans.localPosition = initialVisualLocalPos;
+        }
+        else
+        {
+            transform.position = startPosition;
+            if (healthBarUI != null)
+            {
+                healthBarUI.transform.position = initialHealthBarWorldPos;
+            }
+        }
+
         if (unitImage != null)
         {
             unitImage.color = originalColor;
