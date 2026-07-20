@@ -201,6 +201,24 @@ public class BuildingManager : MonoBehaviour
             activeBuildings = new List<BuildingInstance>();
         }
 
+        // [대장간 기획 템플릿 런타임 획득 보장]
+        if (FindTemplate("Blacksmith") == null)
+        {
+            BuildingData bsData = null;
+#if UNITY_EDITOR
+            bsData = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingData>("Assets/Data/BuildingData/BlacksmithData.asset");
+#endif
+            if (bsData == null)
+            {
+                bsData = Resources.Load<BuildingData>("BuildingData/BlacksmithData");
+            }
+
+            if (bsData != null)
+            {
+                allBuildingTemplates.Add(bsData);
+            }
+        }
+
         for (int i = 0; i < allBuildingTemplates.Count; i++)
         {
             BuildingData data = allBuildingTemplates[i];

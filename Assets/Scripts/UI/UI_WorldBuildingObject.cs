@@ -115,13 +115,14 @@ public class UI_WorldBuildingObject : MonoBehaviour
                 }
             }
 
-            // 3. 최고 레벨 여부에 따른 비용 텍스트 및 클릭 잠금 처리
+            // 3. 최고 레벨 여부에 따른 비용 텍스트 및 클릭 잠금 처리 (대장간 건물은 완공 후에도 팝업 진입을 위해 버튼 클릭 허용)
             if (level >= maxLevel)
             {
                 if (costText != null) costText.text = "MAX";
-                if (buildingButton != null && buildingButton.interactable && !cachedInstance.isConstructing)
+                if (buildingButton != null && !cachedInstance.isConstructing)
                 {
-                    buildingButton.interactable = false;
+                    // 대장간(Blacksmith) 건물은 완공(MAX) 후에도 클릭하여 팝업 창을 열어야 하므로 interactable 유지
+                    buildingButton.interactable = (buildingID == "Blacksmith") || false;
                 }
             }
             else
@@ -206,6 +207,23 @@ public class UI_WorldBuildingObject : MonoBehaviour
 
         Debug.Log($"[UI_WorldBuildingObject] {buildingID} 클릭됨. 업그레이드/건설 시작을 요청합니다.");
         
+        // [대장간 특수 연동]: 대장간(Blacksmith)이 이미 건설 완료(Lv >= 1)된 상태에서 클릭 시 대장간 팝업 UI 오픈
+        if (buildingID == "Blacksmith")
+        {
+            var bInst = cachedInstance != null ? cachedInstance : BuildingManager.Instance.GetBuildingInstance("Blacksmith");
+            if (bInst != null && bInst.currentLevel >= 1 && !bInst.isConstructing)
+            {
+                var blacksmithPanel = Object.FindFirstObjectByType<UI_BlacksmithPanel>(FindObjectsInactive.Include);
+                if (blacksmithPanel != null)
+                {
+                    blacksmithPanel.gameObject.SetActive(true);
+                    blacksmithPanel.RefreshAllUI();
+                    Debug.Log("<color=green>[UI_WorldBuildingObject] 완공된 대장간 팝업 UI를 엽니다!</color>");
+                    return;
+                }
+            }
+        }
+
         // 건설 매니저 시작 신호 전달
         BuildingManager.Instance.StartConstruction(buildingID);
     }

@@ -49,6 +49,9 @@ public class BaseCombatUnit : MonoBehaviour
     [Tooltip("타겟을 추적할 때 적용될 평면 질주 속도입니다.")]
     public float moveSpeed = 100f;
 
+    [Tooltip("한 번의 공격으로 동시 타격 가능한 타겟 수입니다. (기본: 1)")]
+    public int targetCount = 1;
+
     [Header("실시간 AI 상태")]
     [Tooltip("현재 이 유닛이 취하고 있는 AI 상태 머신 정보입니다.")]
     [SerializeField] private UnitState currentState = UnitState.Idle;
@@ -62,6 +65,9 @@ public class BaseCombatUnit : MonoBehaviour
 
     // 보스 처치 후 오른쪽 퇴장 걷기 연출 작동 제어용 플래그
     private bool isVictoryWalking = false;
+
+    [Tooltip("아군 고블린이 손에 장착할 무기 visual 렌더링용 UGUI Image 컴포넌트입니다.")]
+    [SerializeField] public UnityEngine.UI.Image weaponVisual;
 
     // [애니메이션 동기화용] 비주얼 컨트롤러 캐시
     private HeroVisualController visualController;
@@ -210,6 +216,12 @@ public class BaseCombatUnit : MonoBehaviour
 
         // [상단 체력바 UI 자동 동적 생성 및 바인딩]
         EnsureHealthBar();
+
+        // [대장간 장착 무기 visual 및 보너스 스탯 동기화]
+        if (!isEnemy)
+        {
+            RefreshWeaponStatsAndVisual();
+        }
 
         // [타격감 연출] 초기값 획득 및 백업
         unitImage = GetComponent<UnityEngine.UI.Image>();
@@ -701,6 +713,66 @@ public class BaseCombatUnit : MonoBehaviour
             return rectTransform.anchoredPosition;
         }
         return transform.position;
+    }
+
+    /// <summary>
+    /// 대장간에서 장착한 무기의 visual 스프라이트를 갱신하고 기본/추가 옵션 수치를 전투 스탯에 정산 반영합니다.
+    /// </summary>
+    public void RefreshWeaponStatsAndVisual()
+    {
+        if (isEnemy) return;
+
+        // 1. weaponVisual 컴포넌트 자동 획득/생성 보장
+        if (weaponVisual == null)
+        {
+            Transform wTrans = transform.Find("weapon_visual");
+            if (wTrans == null)
+            {
+                GameObject go = new GameObject("weapon_visual", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+                go.transform.SetParent(transform, false);
+                wTrans = go.transform;
+
+                RectTransform rect = go.GetComponent<RectTransform>();
+                rect.anchoredPosition = new Vector2(40f, 0f); // 손 우측 배치 오프셋
+                rect.sizeDelta = new Vector2(50f, 50f);
+            }
+            weaponVisual = wTrans.GetComponent<UnityEngine.UI.Image>();
+        }
+
+        // 2. BlacksmithManager를 통해 장착 무기 및 스탯 연산
+        if (BlacksmithManager.Instance != null && BlacksmithManager.Instance.equippedWeapon != null)
+        {
+            WeaponItemData wData = BlacksmithManager.Instance.equippedWeapon;
+            if (weaponVisual != null)
+            {
+                weaponVisual.sprite = wData.visualSprite != null ? wData.visualSprite : wData.iconSprite;
+                weaponVisual.gameObject.SetActive(true);
+            }
+
+            CalculatedWeaponStats wStats = BlacksmithManager.Instance.GetCalculatedHeroBonusStats();
+
+            // 기본 스탯 + 무기 보너스 스탯 합산 연산
+            int combinedBaseATK = attackDamage + wStats.bonusBaseATK;
+            int finalATK = Mathf.RoundToInt(combinedBaseATK * (1f + wStats.bonusATKPercent));
+            int finalHP = Mathf.RoundToInt(maxHP * (1f + wStats.bonusHPPercent));
+            float currentAPS = 1f / Mathf.Max(0.1f, attackCooldown);
+            float finalAttackSpeed = currentAPS + wStats.bonusAttackSpeed;
+            float finalMoveSpeed = moveSpeed + wStats.bonusMoveSpeed;
+            int finalTargetCount = targetCount + wStats.bonusTargetCount;
+
+            // 디버그 로깅
+            Debug.Log($"<color=cyan>[BaseCombatUnit] 무기 '{wData.weaponName}' 스탯 정산 적용!</color>\n" +
+                      $"- 최종 공격력: {finalATK} (기본 {combinedBaseATK} x (1+{wStats.bonusATKPercent:P0}))\n" +
+                      $"- 최종 체력: {finalHP} (기본 {maxHP} x (1+{wStats.bonusHPPercent:P0}))\n" +
+                      $"- 공속: {finalAttackSpeed:F2} / 이속: {finalMoveSpeed:F1} / 타겟수: {finalTargetCount}");
+        }
+        else
+        {
+            if (weaponVisual != null)
+            {
+                weaponVisual.gameObject.SetActive(false);
+            }
+        }
     }
 
     /// <summary>

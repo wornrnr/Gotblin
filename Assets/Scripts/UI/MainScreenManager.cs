@@ -57,6 +57,14 @@ public class MainScreenManager : MonoBehaviour
         {
             townBuildingPanel.SetActive(true);
 
+            // [대장간 건물 오브젝트 자동 셋업]
+            var bsSetup = townBuildingPanel.GetComponent<TownBuildingBlacksmithSetup>();
+            if (bsSetup == null)
+            {
+                bsSetup = townBuildingPanel.AddComponent<TownBuildingBlacksmithSetup>();
+            }
+            bsSetup.EnsureBlacksmithBuilding();
+
             // [핵심 요구사항] 진입 시 하위에 등록된 모든 건설 슬롯의 UI 갱신 일괄 호출
             UI_BuildingSlot[] slots = townBuildingPanel.GetComponentsInChildren<UI_BuildingSlot>(true);
             for (int i = 0; i < slots.Length; i++)
