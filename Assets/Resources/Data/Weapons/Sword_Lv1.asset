@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37ac19c60858c134baed394e5817140e, type: 3}
+  m_Name: sword_1
+  m_EditorClassIdentifier: 
+  weaponID: sword_1
+  weaponName: "강철검 1?�계"
+  weaponType: "?�손검"
+  grade: 1
+  visualSprite: {fileID: 0}
+  iconSprite: {fileID: 0}
+  baseATK: 30
+  additionalOptions:
+  - optionType: 0
+    value: 0.1
+  upgradeSuccessRate: 0.65
+  upgradeKeepRate: 0.25
+  requiredIronIngot: 8
+  nextGradeWeapon: {fileID: 11400000, guid: b2222222222222222222222222222222, type: 2}

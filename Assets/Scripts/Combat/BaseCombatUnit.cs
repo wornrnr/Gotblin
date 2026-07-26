@@ -52,12 +52,19 @@ public class BaseCombatUnit : MonoBehaviour
     [Tooltip("한 번의 공격으로 동시 타격 가능한 타겟 수입니다. (기본: 1)")]
     public int targetCount = 1;
 
+    [Tooltip("유닛의 퍼센트 방어력 수치입니다. (0.1 = 10%, 최대 상한선: 90%)")]
+    public float defensePercent = 0f;
+
+    // 방어력(%) 최대 상한선 상수 (90%)
+    public const float MAX_DEFENSE_PERCENT_CAP = 0.90f;
+
     [Header("실시간 AI 상태")]
     [Tooltip("현재 이 유닛이 취하고 있는 AI 상태 머신 정보입니다.")]
     [SerializeField] private UnitState currentState = UnitState.Idle;
 
     private RectTransform rectTransform;
     private BaseCombatUnit currentTarget;
+    private List<BaseCombatUnit> currentTargets = new List<BaseCombatUnit>();
     private float attackTimer = 0f;
 
     // 포위 연출 시 겹침 방지를 위해 지정되는 고유의 타겟 타격 오프셋 벡터
@@ -121,6 +128,7 @@ public class BaseCombatUnit : MonoBehaviour
         
         // 2. 타겟팅 및 상태 비활성 초기화
         currentTarget = null;
+        currentTargets.Clear();
         isVictoryWalking = false;
 
         // 3. [피격 찌꺼기 정리]: 넉백 코루틴 중단 및 크기, 컬러 원상복구
@@ -308,32 +316,42 @@ public class BaseCombatUnit : MonoBehaviour
             return;
         }
 
-        // 2. 적 탐색 (현재 타겟이 없거나 이미 처치된 경우에만 새로운 최단 거리 적 검색)
-        if (currentTarget == null || currentTarget.IsDead() || !currentTarget.gameObject.activeInHierarchy)
-        {
-            BaseCombatUnit previousTarget = currentTarget;
-            if (CombatManager.Instance != null)
-            {
-                currentTarget = CombatManager.Instance.GetClosestTarget(this);
-            }
+        // 2. [타겟 지정 및 사망 시까지 타겟 고정 규칙 적용]
+        // 기존 타겟 리스트 중 사망하거나 비활성화된 유닛만 제거하고, 살아있는 타겟은 고정 유지합니다.
+        currentTargets.RemoveAll(t => t == null || t.IsDead() || !t.gameObject.activeInHierarchy);
 
-            // [동적 오프셋 갱신 및 쿨타임 초기화]: 새로운 적인 타겟으로 변경될 때마다 오프셋 할당 및 공격 타이머 리셋
-            if (currentTarget != previousTarget && currentTarget != null)
+        if (currentTargets.Count < targetCount && CombatManager.Instance != null)
+        {
+            var candidates = CombatManager.Instance.GetClosestTargets(this, targetCount);
+            foreach (var cand in candidates)
             {
-                Vector2 randomPos = Random.insideUnitCircle * (attackRange * 0.8f);
-                attackPositionOffset = new Vector3(randomPos.x, randomPos.y, 0f);
-                attackTimer = 0f;
+                if (currentTargets.Count >= targetCount) break;
+                if (cand != null && !cand.IsDead() && !currentTargets.Contains(cand))
+                {
+                    currentTargets.Add(cand);
+                }
             }
         }
 
-        // [모듈형 비주얼 뒤집기 연동] 적이 내 왼쪽에 있다면 왼쪽을 바라보고, 오른쪽에 있다면 오른쪽을 바라봄
+        BaseCombatUnit previousTarget = currentTarget;
+        currentTarget = currentTargets.Count > 0 ? currentTargets[0] : null;
+
+        // [동적 오프셋 갱신 및 쿨타임 초기화]: 대표 타겟이 변경될 때 오프셋 할당
+        if (currentTarget != previousTarget && currentTarget != null)
+        {
+            Vector2 randomPos = Random.insideUnitCircle * (attackRange * 0.8f);
+            attackPositionOffset = new Vector3(randomPos.x, randomPos.y, 0f);
+            attackTimer = 0f;
+        }
+
+        // [모듈형 비주얼 뒤집기 연동] 대표 적이 내 왼쪽에 있다면 왼쪽을 바라보고, 오른쪽에 있다면 오른쪽을 바라봄
         if (currentTarget != null)
         {
-            HeroVisualController visualController = GetComponent<HeroVisualController>();
-            if (visualController != null)
+            HeroVisualController visualCtrl = GetComponent<HeroVisualController>();
+            if (visualCtrl != null)
             {
                 bool isTargetLeft = currentTarget.transform.position.x < transform.position.x;
-                visualController.SetFacingDirection(isTargetLeft);
+                visualCtrl.SetFacingDirection(isTargetLeft);
             }
         }
 
@@ -341,30 +359,26 @@ public class BaseCombatUnit : MonoBehaviour
         if (currentTarget == null || currentTarget.IsDead())
         {
             currentState = UnitState.Idle;
-            currentTarget = null; // 죽은 타겟 참조 정리
-            attackTimer = 0f; // 타겟 소멸 시 쿨타임 타이머 즉시 리셋
+            currentTarget = null;
+            currentTargets.Clear();
+            attackTimer = 0f;
         }
         else
         {
             // [부모 계층 좌표 불일치 해결] 두 유닛의 캔버스 상 부모가 달라도 정확히 거리를 잴 수 있도록 월드 공간 거리 측정
-            // [포위망 오프셋 반영]: 타겟의 정중앙이 아닌, 타겟 주변의 고유 포위 목표 좌표를 최종 목적지로 계산
             Vector3 targetDest = currentTarget.transform.position + attackPositionOffset;
             
             float targetRadius = currentTarget.bodyRadius;
             float minKeepDistance = this.bodyRadius + targetRadius;
             
-            // 타겟 중심과의 절대 월드 거리 측정
             float distanceToTargetCenter = Vector3.Distance(transform.position, currentTarget.transform.position);
 
-            // [사거리 & 덩치 겹침 방지 결합]: 최소 필수 대치 간격보다 멀고, 사정거리(attackRange)보다도 멀 때만 추적(Chasing)합니다.
             if (distanceToTargetCenter > minKeepDistance && distanceToTargetCenter > attackRange)
             {
-                // 아직 사거리 밖이고 목적지에도 도달하지 못했다면 추적 상태
                 currentState = UnitState.Chasing;
             }
             else
             {
-                // 덩치 경계선에 닿았거나 사거리 내 진입했다면 대치 및 공격 상태(Attacking)로 돌입 (제자리 정지)
                 currentState = UnitState.Attacking;
             }
         }
@@ -414,7 +428,6 @@ public class BaseCombatUnit : MonoBehaviour
         Vector3[] corners = new Vector3[4];
         bgRect.GetWorldCorners(corners);
 
-        // 여백(bodyRadius)을 감안하여 유닛의 중심점이 배경 판 경계를 벗어나지 않게 설정
         float minX = corners[0].x + bodyRadius;
         float maxX = corners[2].x - bodyRadius;
         float minY = corners[0].y + bodyRadius;
@@ -449,24 +462,20 @@ public class BaseCombatUnit : MonoBehaviour
         Vector3 myPos = transform.position;
         Vector3 targetPos = currentTarget.transform.position;
 
-        // 상대방과의 겹침 최소 거리에 산개 오프셋을 더한 안전 목적지(destination) 산출
         Vector3 offsetDir = attackPositionOffset != Vector3.zero ? attackPositionOffset.normalized : (myPos - targetPos).normalized;
         Vector3 destination = targetPos + (offsetDir * minKeepDistance);
 
-        // 내 현재 위치에서 안전 목적지까지의 방향 지향 벡터
         Vector3 moveDir = (destination - myPos);
-        moveDir.z = 0; // Z축 고정
+        moveDir.z = 0;
 
         if (moveDir.sqrMagnitude > 1f)
         {
             Vector3 direction = moveDir.normalized;
 
-            // 월드 좌표계를 기준으로 안전 범위까지만 이동
             Vector3 nextPos = transform.position + (Vector3)(direction * moveSpeed * Time.deltaTime);
-            nextPos.z = 0f; // Z축 렌더링 순서 보장
+            nextPos.z = 0f;
             transform.position = nextPos;
 
-            // X축 이동 방향 기준 스프라이트 localScale 좌우 반전 플립 처리 (모듈형 비주얼 컨트롤러가 없는 유닛만 개별 가동)
             if (direction.x != 0f && GetComponent<HeroVisualController>() == null)
             {
                 Vector3 scale = transform.localScale;
@@ -477,48 +486,53 @@ public class BaseCombatUnit : MonoBehaviour
     }
 
     /// <summary>
-    /// 공격 쿨타임을 누적하고, 주기가 완료되면 타겟에 피해를 입힙니다.
+    /// 공격 쿨타임을 누적하고, 주기가 완료되면 지정된 다중 타겟(targetCount)에게 동시에 피해를 입힙니다.
     /// </summary>
     private void ExecuteAttackLogic()
     {
-        if (currentTarget == null || currentTarget.IsDead()) return;
+        if (currentTargets.Count == 0) return;
 
         attackTimer += Time.deltaTime;
         if (attackTimer >= attackCooldown)
         {
             attackTimer = 0f;
             
-            // [애니메이션 동기화] 무기를 휘두르는 타격 발생 순간 Attack 트리거 가동
             if (visualController != null)
             {
                 visualController.TriggerAttackAnimation();
             }
 
-            // [타격 시점 동기화] attackHitDelay(기본 0.25초) 지연 후 무기가 적에게 맞는 타이밍에 TakeDamage 수신
-            StartCoroutine(PerformDelayedDamage(currentTarget, attackDamage, attackHitDelay));
+            // 고정된 다중 타겟 리스트 복사 후 타격 시점 지연 코루틴 실행
+            List<BaseCombatUnit> targetsToHit = new List<BaseCombatUnit>(currentTargets);
+            StartCoroutine(PerformDelayedDamage(targetsToHit, attackDamage, attackHitDelay));
         }
     }
 
     /// <summary>
-    /// 무기 모션 궤적(휘두르는 프레임) 타이밍에 맞춰 타격 피해를 전달하는 지연 코루틴입니다.
+    /// 무기 모션 궤적 타이밍에 맞춰 고정된 다중 타겟들(targetCount)에게 동시에 피해를 전달하는 지연 코루틴입니다.
     /// </summary>
-    private System.Collections.IEnumerator PerformDelayedDamage(BaseCombatUnit target, int damage, float delay)
+    private System.Collections.IEnumerator PerformDelayedDamage(List<BaseCombatUnit> targets, int damage, float delay)
     {
         if (delay > 0f)
         {
             yield return new WaitForSeconds(delay);
         }
 
-        // 지연 시간 후 타깃과 나 자신의 상태 무결성 검증 (사망, 파괴, 사망한 적 예방)
-        if (target != null && !target.IsDead() && !IsDead() && currentState != UnitState.Dead)
+        if (IsDead() || currentState == UnitState.Dead) yield break;
+
+        for (int i = 0; i < targets.Count; i++)
         {
-            Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 적 <color=red>{target.gameObject.name}</color>을(를) 휘둘러 타격! (피해량: {damage})");
-            target.TakeDamage(damage, transform.position);
+            var target = targets[i];
+            if (target != null && !target.IsDead())
+            {
+                Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 타겟 <color=red>{target.gameObject.name}</color>에게 동시 타격! (피해량: {damage})");
+                target.TakeDamage(damage, transform.position);
+            }
         }
     }
 
     /// <summary>
-    /// 외부로부터 공격 피해를 수신하여 체력을 감소시킵니다. (피격 넉백 연출 포함)
+    /// 외부로부터 공격 피해를 수신하여 체력을 감소시킵니다. (퍼센트 방어력 90% Cap 적용 및 피격 넉백 연출 포함)
     /// </summary>
     /// <param name="amount">데미지량</param>
     /// <param name="attackerPosition">나를 가격한 상대방의 위치 좌표</param>
@@ -526,14 +540,17 @@ public class BaseCombatUnit : MonoBehaviour
     {
         if (currentState == UnitState.Dead) return;
 
-        // [코딩 제약 조건] 연출 전용 가짜 난전 모드인 경우 피해를 0(무시) 처리
         if (isDecorationMode)
         {
             return;
         }
 
-        currentHP = Mathf.Max(0, currentHP - amount);
-        Debug.Log($"[{gameObject.name}] 피격 발생! (-{amount} HP) / 현재 체력: {currentHP}/{maxHP}");
+        // [방어력(%) 최대 상한선 90% 적용 및 데미지 감쇄 연산]
+        float effectiveDefense = Mathf.Clamp(defensePercent, 0f, MAX_DEFENSE_PERCENT_CAP);
+        int finalDamage = Mathf.Max(1, Mathf.RoundToInt(amount * (1f - effectiveDefense)));
+
+        currentHP = Mathf.Max(0, currentHP - finalDamage);
+        Debug.Log($"[{gameObject.name}] 피격 발생! (-{finalDamage} HP, 방어력 {effectiveDefense * 100:F0}% 적용 / 원본 {amount}) / 현재 체력: {currentHP}/{maxHP}");
 
         // [상단 체력바 UI 수치 동기화]
         EnsureHealthBar();

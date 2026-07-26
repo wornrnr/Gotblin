@@ -71,6 +71,44 @@ public class CombatManager : MonoBehaviour
         return closestTarget;
     }
 
+    /// <summary>
+    /// 요청 유닛의 사거리 내/전장 기준 최단 거리 N명의 생존 유닛 타겟 리스트를 반환합니다.
+    /// 기존 타겟 유지 및 다중 타겟(targetCount) 공격 시스템 지원용입니다.
+    /// </summary>
+    public List<BaseCombatUnit> GetClosestTargets(BaseCombatUnit requestUnit, int count)
+    {
+        List<BaseCombatUnit> result = new List<BaseCombatUnit>();
+        if (requestUnit == null || count <= 0) return result;
+
+        List<BaseCombatUnit> targetList = requestUnit.isEnemy ? playerUnits : enemyUnits;
+        if (targetList == null || targetList.Count == 0) return result;
+
+        Vector3 myPos = requestUnit.transform.position;
+
+        // 사망 및 null 유닛 정제
+        List<BaseCombatUnit> validTargets = new List<BaseCombatUnit>();
+        for (int i = targetList.Count - 1; i >= 0; i--)
+        {
+            if (targetList[i] == null || targetList[i].currentHP <= 0)
+            {
+                targetList.RemoveAt(i);
+                continue;
+            }
+            validTargets.Add(targetList[i]);
+        }
+
+        // 월드 거리 순 정렬 후 상위 count개 타겟 추출
+        validTargets.Sort((a, b) => Vector3.Distance(myPos, a.transform.position).CompareTo(Vector3.Distance(myPos, b.transform.position)));
+
+        int fetchCount = Mathf.Min(count, validTargets.Count);
+        for (int i = 0; i < fetchCount; i++)
+        {
+            result.Add(validTargets[i]);
+        }
+
+        return result;
+    }
+
     // -----------------------------------------------------------------------------------
     // 유닛 등록/해제 편의 메서드군
     // -----------------------------------------------------------------------------------

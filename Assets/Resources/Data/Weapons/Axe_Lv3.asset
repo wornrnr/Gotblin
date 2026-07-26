@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37ac19c60858c134baed394e5817140e, type: 3}
+  m_Name: axe_3
+  m_EditorClassIdentifier: 
+  weaponID: axe_3
+  weaponName: "?�괴??광도?? "
+  weaponType: "?�투?�끼 3 280 0.20 0.50 75 "
+  grade: fileID: 0
+  visualSprite: {fileID: 0}
+  iconSprite: {fileID: 0}
+  baseATK:    - optionType: 3
+    value: 0.6
+  - optionType: 1
+    value: 2)
+Set-Content 
+  additionalOptions:
+c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv1.asset.meta (Create-MetaYaml System.Collections.Hashtable[ruby_1])
+
+Set-Content c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv2.asset (Create-GemYaml ruby_2 루비
+  upgradeSuccessRate: c:\Users\anyes\Gotblin2\Assets\Resources\Data\Weapons\Axe_Lv3.asset.meta (Create-MetaYaml System.Collections.Hashtable[axe_3])
+
+# 4. Gems
+Set-Content c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv1.asset (Create-GemYaml ruby_1 루비
+  upgradeKeepRate: 1?�계 1 500 0.60 0.30 
+  requiredIronIngot: fileID: 11400000, guid: $($guids['ruby_2']), type: 2
+  nextGradeWeapon: )
+Set-Content 

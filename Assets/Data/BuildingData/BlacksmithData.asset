@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: BlacksmithData
   m_EditorClassIdentifier: 
   buildingID: Blacksmith
-  buildingName: 대장간
+  buildingName: "\uB300\uC7A5\uAC04"
   levelSettings:
   - level: 0
     upgradeCost: 200
     buildDuration: 5
-    visualSprite: {fileID: 0}
+    visualSprite: {fileID: 599616928515528529, guid: fc2596969ce4159478983c0d79e57581, type: 3}
   - level: 1
     upgradeCost: 500
     buildDuration: 10
-    visualSprite: {fileID: 0}
+    visualSprite: {fileID: 21300000, guid: 58e1762c4b8e2194bb6392095f9c4701, type: 3}
