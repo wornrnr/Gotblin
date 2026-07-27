@@ -13,17 +13,12 @@ MonoBehaviour:
   m_Name: dagger_3
   m_EditorClassIdentifier: 
   weaponID: dagger_3
-  weaponName: "ê·¸ë¦¼???¨ê?"
-  weaponType: "?¨ê?"
+  weaponName: "\uADF8\uB9BC\uC790 \uB2E8\uAC80"
+  weaponType: "\uB2E8\uAC80"
   grade: 3
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 90
-  additionalOptions:
-  - optionType: 2
-    value: 1.2
-  - optionType: 4
-    value: 60
   upgradeSuccessRate: 0.3
   upgradeKeepRate: 0.4
   requiredIronIngot: 45

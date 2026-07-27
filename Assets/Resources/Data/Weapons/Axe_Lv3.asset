@@ -13,25 +13,13 @@ MonoBehaviour:
   m_Name: axe_3
   m_EditorClassIdentifier: 
   weaponID: axe_3
-  weaponName: "?�괴??광도?? "
-  weaponType: "?�투?�끼 3 280 0.20 0.50 75 "
-  grade: fileID: 0
+  weaponName: "\uD30C\uAD34\uC758 \uAD11\uB3C4\uB07C"
+  weaponType: "\uC804\uD22C\uB3C4\uB07C"
+  grade: 3
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
-  baseATK:    - optionType: 3
-    value: 0.6
-  - optionType: 1
-    value: 2)
-Set-Content 
-  additionalOptions:
-c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv1.asset.meta (Create-MetaYaml System.Collections.Hashtable[ruby_1])
-
-Set-Content c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv2.asset (Create-GemYaml ruby_2 루비
-  upgradeSuccessRate: c:\Users\anyes\Gotblin2\Assets\Resources\Data\Weapons\Axe_Lv3.asset.meta (Create-MetaYaml System.Collections.Hashtable[axe_3])
-
-# 4. Gems
-Set-Content c:\Users\anyes\Gotblin2\Assets\Resources\Data\Gems\Ruby_Lv1.asset (Create-GemYaml ruby_1 루비
-  upgradeKeepRate: 1?�계 1 500 0.60 0.30 
-  requiredIronIngot: fileID: 11400000, guid: $($guids['ruby_2']), type: 2
-  nextGradeWeapon: )
-Set-Content 
+  baseATK: 280
+  upgradeSuccessRate: 0.2
+  upgradeKeepRate: 0.5
+  requiredIronIngot: 75
+  nextGradeWeapon: {fileID: 0}

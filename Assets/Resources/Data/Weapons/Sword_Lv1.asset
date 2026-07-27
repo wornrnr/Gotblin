@@ -13,15 +13,12 @@ MonoBehaviour:
   m_Name: sword_1
   m_EditorClassIdentifier: 
   weaponID: sword_1
-  weaponName: "강철검 1?�계"
-  weaponType: "?�손검"
+  weaponName: "\uAC15\uCCA0\uAC80 1\uB2E8\uACC4"
+  weaponType: "\uC591\uC190\uAC80"
   grade: 1
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 30
-  additionalOptions:
-  - optionType: 0
-    value: 0.1
   upgradeSuccessRate: 0.65
   upgradeKeepRate: 0.25
   requiredIronIngot: 8

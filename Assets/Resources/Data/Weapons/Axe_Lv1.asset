@@ -13,15 +13,12 @@ MonoBehaviour:
   m_Name: axe_1
   m_EditorClassIdentifier: 
   weaponID: axe_1
-  weaponName: "Î≤åÎ™©?ÑÎÅº"
-  weaponType: "?ÑÌà¨?ÑÎÅº"
+  weaponName: "\uBC8C\uBAA9\uB3C4\uB07C"
+  weaponType: "\uC804\uD22C\uB3C4\uB07C"
   grade: 1
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 50
-  additionalOptions:
-  - optionType: 3
-    value: 0.1
   upgradeSuccessRate: 0.6
   upgradeKeepRate: 0.3
   requiredIronIngot: 10

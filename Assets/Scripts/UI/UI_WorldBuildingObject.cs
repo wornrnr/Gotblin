@@ -115,14 +115,14 @@ public class UI_WorldBuildingObject : MonoBehaviour
                 }
             }
 
-            // 3. 최고 레벨 여부에 따른 비용 텍스트 및 클릭 잠금 처리 (대장간 건물은 완공 후에도 팝업 진입을 위해 버튼 클릭 허용)
+            // 3. 최고 레벨 여부에 따른 비용 텍스트 및 클릭 잠금 처리 (완공된 건물은 팝업 진입을 위해 버튼 터치 클릭 허용)
             if (level >= maxLevel)
             {
                 if (costText != null) costText.text = "MAX";
                 if (buildingButton != null && !cachedInstance.isConstructing)
                 {
-                    // 대장간(Blacksmith) 건물은 완공(MAX) 후에도 클릭하여 팝업 창을 열어야 하므로 interactable 유지
-                    buildingButton.interactable = (buildingID == "Blacksmith") || false;
+                    // 완공(Lv>=1)된 건물은 팝업 창(PopupManager) 열기를 위해 버튼 터치 클릭을 항상 허용합니다.
+                    buildingButton.interactable = true;
                 }
             }
             else
@@ -205,12 +205,12 @@ public class UI_WorldBuildingObject : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[UI_WorldBuildingObject] {buildingID} 클릭됨. 업그레이드/건설 시작을 요청합니다.");
-        
+        var bInst = cachedInstance != null ? cachedInstance : (BuildingManager.Instance != null ? BuildingManager.Instance.GetBuildingInstance(buildingID) : null);
+
         // [전역 다중 팝업 아키텍처 연동]: 완공(Lv >= 1)된 건물을 클릭했을 때 대응하는 팝업 UI(PopupManager)를 자동으로 오픈합니다.
-        if (cachedInstance != null && cachedInstance.currentLevel >= 1 && !cachedInstance.isConstructing)
+        if (bInst != null && bInst.currentLevel >= 1 && !bInst.isConstructing)
         {
-            if (PopupManager.Instance != null && PopupManager.Instance.HasPopup(buildingID))
+            if (PopupManager.Instance != null)
             {
                 bool opened = PopupManager.Instance.OpenPopup(buildingID);
                 if (opened)
@@ -220,23 +220,22 @@ public class UI_WorldBuildingObject : MonoBehaviour
                 }
             }
 
-            // 폴백: PopupManager 미등록 시 direct 탐색
-            UI_BasePopup targetPopup = null;
+            // 폴백: 씬 내 UI_BasePopup 대소문자/타입 2중 탐색
             UI_BasePopup[] popups = Object.FindObjectsByType<UI_BasePopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var pop in popups)
             {
-                if (pop != null && (pop.popupID == buildingID || (buildingID == "TownHall" && pop.popupID == "HQ")))
+                if (pop != null)
                 {
-                    targetPopup = pop;
-                    break;
+                    string popID = pop.EnsurePopupID();
+                    if (string.Equals(popID, buildingID, System.StringComparison.OrdinalIgnoreCase) ||
+                        (buildingID.Equals("Blacksmith", System.StringComparison.OrdinalIgnoreCase) && pop is UI_BlacksmithPanel) ||
+                        ((buildingID.Equals("TownHall", System.StringComparison.OrdinalIgnoreCase) || buildingID.Equals("HQ", System.StringComparison.OrdinalIgnoreCase)) && pop is UI_HQPanel))
+                    {
+                        pop.OpenPopup();
+                        Debug.Log($"<color=green>[UI_WorldBuildingObject] 건물 '{buildingID}'의 팝업 UI({pop.gameObject.name})를 직접 활성화하였습니다.</color>");
+                        return;
+                    }
                 }
-            }
-
-            if (targetPopup != null)
-            {
-                targetPopup.OpenPopup();
-                Debug.Log($"<color=green>[UI_WorldBuildingObject] 건물 '{buildingID}'의 팝업 UI를 직접 활성화하였습니다.</color>");
-                return;
             }
         }
 

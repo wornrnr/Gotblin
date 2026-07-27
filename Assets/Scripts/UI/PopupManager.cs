@@ -14,8 +14,8 @@ public class PopupManager : MonoBehaviour
     [Tooltip("씬 캔버스 하위에 위치하는 팝업 전용 부모 레이어 Transform입니다.")]
     [SerializeField] private Transform popupLayerParent;
 
-    // popupID -> UI_BasePopup 딕셔너리 레지스트리
-    private Dictionary<string, UI_BasePopup> registeredPopups = new Dictionary<string, UI_BasePopup>();
+    // popupID -> UI_BasePopup 딕셔너리 레지스트리 (대소문자 무시 비교자 적용)
+    private Dictionary<string, UI_BasePopup> registeredPopups = new Dictionary<string, UI_BasePopup>(System.StringComparer.OrdinalIgnoreCase);
 
     private void Awake()
     {
@@ -47,15 +47,19 @@ public class PopupManager : MonoBehaviour
 
         foreach (var popup in popups)
         {
-            if (popup != null && !string.IsNullOrEmpty(popup.popupID))
+            if (popup != null)
             {
-                registeredPopups[popup.popupID] = popup;
+                string id = popup.EnsurePopupID();
+                if (!string.IsNullOrEmpty(id))
+                {
+                    registeredPopups[id] = popup;
 
-                // 2차 별칭 등록 (예: HQ <-> TownHall)
-                if (popup.popupID == "HQ") registeredPopups["TownHall"] = popup;
-                if (popup.popupID == "TownHall") registeredPopups["HQ"] = popup;
+                    // 2차 별칭 등록 (예: HQ <-> TownHall)
+                    if (string.Equals(id, "HQ", System.StringComparison.OrdinalIgnoreCase)) registeredPopups["TownHall"] = popup;
+                    if (string.Equals(id, "TownHall", System.StringComparison.OrdinalIgnoreCase)) registeredPopups["HQ"] = popup;
 
-                Debug.Log($"<color=cyan>[PopupManager] 팝업 '{popup.popupID}' ({popup.gameObject.name}) 레지스트리 등록 완료.</color>");
+                    Debug.Log($"<color=cyan>[PopupManager] 팝업 '{id}' ({popup.gameObject.name}) 레지스트리 등록 완료.</color>");
+                }
             }
         }
     }
@@ -74,12 +78,26 @@ public class PopupManager : MonoBehaviour
 
         if (registeredPopups.TryGetValue(popupID, out var targetPopup) && targetPopup != null)
         {
-            // 다른 활성 팝업 닫기 (단일 모달 팝업 정책)
             CloseAllPopups();
-
             targetPopup.OpenPopup();
             Debug.Log($"<color=green>[PopupManager] 팝업 '{popupID}' 오픈 성공!</color>");
             return true;
+        }
+
+        // 2차 클래스 타입 및 씬 팝업 직접 탐색 폴백
+        UI_BasePopup[] popups = Object.FindObjectsByType<UI_BasePopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var pop in popups)
+        {
+            if (pop != null && (string.Equals(pop.EnsurePopupID(), popupID, System.StringComparison.OrdinalIgnoreCase) ||
+                               (popupID.Equals("Blacksmith", System.StringComparison.OrdinalIgnoreCase) && pop is UI_BlacksmithPanel) ||
+                               ((popupID.Equals("HQ", System.StringComparison.OrdinalIgnoreCase) || popupID.Equals("TownHall", System.StringComparison.OrdinalIgnoreCase)) && pop is UI_HQPanel)))
+            {
+                registeredPopups[popupID] = pop;
+                CloseAllPopups();
+                pop.OpenPopup();
+                Debug.Log($"<color=green>[PopupManager] 타입 폴백으로 팝업 '{popupID}' ({pop.gameObject.name}) 오픈 성공!</color>");
+                return true;
+            }
         }
 
         Debug.LogWarning($"[PopupManager] '{popupID}' 식별자를 가진 팝업 UI를 찾을 수 없습니다.");

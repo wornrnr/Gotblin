@@ -13,17 +13,12 @@ MonoBehaviour:
   m_Name: sword_3
   m_EditorClassIdentifier: 
   weaponID: sword_3
-  weaponName: "?©ÏÇ¥Í≤Ä 3?®Í≥Ñ"
-  weaponType: "?ëÏÜêÍ≤Ä"
+  weaponName: "\uC6A9\uC0B4\uAC80 3\uB2E8\uACC4"
+  weaponType: "\uC591\uC190\uAC80"
   grade: 3
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 160
-  additionalOptions:
-  - optionType: 0
-    value: 0.6
-  - optionType: 1
-    value: 2
   upgradeSuccessRate: 0.25
   upgradeKeepRate: 0.45
   requiredIronIngot: 60

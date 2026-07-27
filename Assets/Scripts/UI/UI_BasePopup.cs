@@ -16,11 +16,34 @@ public abstract class UI_BasePopup : MonoBehaviour
 
     protected virtual void Awake()
     {
+        EnsurePopupID();
+
         if (closeButton != null)
         {
             closeButton.onClick.RemoveAllListeners();
             closeButton.onClick.AddListener(ClosePopup);
         }
+    }
+
+    protected virtual void OnValidate()
+    {
+        EnsurePopupID();
+    }
+
+    /// <summary>
+    /// popupID가 비어있을 경우 클래스 이름(UI_BlacksmithPanel -> Blacksmith)에서 고유 ID를 자동 도출합니다.
+    /// </summary>
+    public string EnsurePopupID()
+    {
+        if (string.IsNullOrEmpty(popupID))
+        {
+            string className = GetType().Name;
+            if (className.StartsWith("UI_")) className = className.Substring(3);
+            if (className.EndsWith("Panel")) className = className.Substring(0, className.Length - 5);
+            if (className.EndsWith("Popup")) className = className.Substring(0, className.Length - 5);
+            popupID = className;
+        }
+        return popupID;
     }
 
     /// <summary>

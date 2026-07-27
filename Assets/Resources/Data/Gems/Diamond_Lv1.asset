@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: diamond_1
   m_EditorClassIdentifier: 
   gemID: diamond_1
-  gemName: "?ค์ด?๋ชฌ??1?จ๊ณ"
+  gemName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 1\uB2E8\uACC4"
   level: 1
   iconSprite: {fileID: 0}
   sellPrice: 2000

@@ -13,18 +13,13 @@ MonoBehaviour:
   m_Name: axe_2
   m_EditorClassIdentifier: 
   weaponID: axe_2
-  weaponName: "?ÑÌà¨?ÑÎÅº"
-  weaponType: "?ÑÌà¨?ÑÎÅº"
+  weaponName: "\uC804\uD22C\uB3C4\uB07C"
+  weaponType: "\uC804\uD22C\uB3C4\uB07C"
   grade: 2
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 120
-  additionalOptions:
-  - optionType: 3
-    value: 0.25
-  - optionType: 1
-    value: 1
   upgradeSuccessRate: 0.4
   upgradeKeepRate: 0.4
   requiredIronIngot: 25
-  nextGradeWeapon: {fileID: 11400000, guid: c3333333333333333333333333333333, type: 2}
+  nextGradeWeapon: {fileID: 11400000, guid: 9ffe93ab84452604581e26305b78738d, type: 2}
