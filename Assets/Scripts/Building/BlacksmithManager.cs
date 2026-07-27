@@ -125,14 +125,13 @@ public class BlacksmithManager : MonoBehaviour
         // 2. 철 주괴 차감
         ironIngotCount -= weapon.requiredIronIngot;
 
-        // 3. 강화 확률 연산
-        float rnd = UnityEngine.Random.value;
-        float successRatio = Mathf.Clamp01(weapon.upgradeSuccessRate);
-        float keepRatio = Mathf.Clamp01(weapon.upgradeKeepRate);
+        // 3. 가중치 기반 강화 확률 연산 (성공 : 실패/유지 : 파괴)
+        int totalWeight = weapon.TotalWeight;
+        int rnd = UnityEngine.Random.Range(0, totalWeight);
 
         WeaponEnhanceResult result;
 
-        if (rnd <= successRatio)
+        if (rnd < weapon.successWeight)
         {
             // [성공]: 다음 단계 무기로 인벤토리 교체
             result = WeaponEnhanceResult.Success;
@@ -157,14 +156,14 @@ public class BlacksmithManager : MonoBehaviour
                 }
             }
         }
-        else if (rnd <= successRatio + keepRatio)
+        else if (rnd < weapon.successWeight + weapon.keepWeight)
         {
-            // [유지]: 변화 없음
+            // [실패 / 유지]: 현재 단계를 유지 (변화 없음)
             result = WeaponEnhanceResult.Keep;
         }
         else
         {
-            // [실패]: 파괴 방지권 사용 여부에 따른 분기
+            // [파괴]: 무기를 인벤토리에서 소멸 처리 (파괴 방지권 사용 시 보존)
             if (useProtectionItem && protectionItemCount > 0)
             {
                 protectionItemCount--;
@@ -188,19 +187,18 @@ public class BlacksmithManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 보석을 대장간에서 강화 처리합니다. (성공 / 유지 / 파괴)
+    /// 보석을 대장간에서 강화 처리합니다. (가중치 기반: 성공 / 유지 / 파괴)
     /// </summary>
     public GemEnhanceResult EnhanceGem(GemItemData gem)
     {
         if (gem == null) return GemEnhanceResult.Keep;
 
-        float rnd = UnityEngine.Random.value;
-        float successRatio = Mathf.Clamp01(gem.upgradeSuccessRate);
-        float keepRatio = Mathf.Clamp01(gem.upgradeKeepRate);
+        int totalWeight = gem.TotalWeight;
+        int rnd = UnityEngine.Random.Range(0, totalWeight);
 
         GemEnhanceResult result;
 
-        if (rnd <= successRatio)
+        if (rnd < gem.successWeight)
         {
             result = GemEnhanceResult.Success;
             if (gem.nextLevelGem != null)
@@ -216,7 +214,7 @@ public class BlacksmithManager : MonoBehaviour
                 }
             }
         }
-        else if (rnd <= successRatio + keepRatio)
+        else if (rnd < gem.successWeight + gem.keepWeight)
         {
             result = GemEnhanceResult.Keep;
         }

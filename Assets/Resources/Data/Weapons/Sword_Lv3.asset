@@ -19,7 +19,8 @@ MonoBehaviour:
   visualSprite: {fileID: 0}
   iconSprite: {fileID: 0}
   baseATK: 160
-  upgradeSuccessRate: 0.25
-  upgradeKeepRate: 0.45
+  successWeight: 3
+  keepWeight: 1
+  destroyWeight: 1
   requiredIronIngot: 60
   nextGradeWeapon: {fileID: 0}

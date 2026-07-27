@@ -58,14 +58,35 @@ public class WeaponItemData : ScriptableObject
     [Tooltip("[추가 옵션] 등급 및 종류에 따라 추가 부여되는 옵션 목록입니다. (공격력%, 타겟수, 공속, 생명력%, 이동속도)")]
     public List<ItemOption> additionalOptions = new List<ItemOption>();
 
-    [Header("강화 밸런스 설정")]
-    [Tooltip("강화 성공 확률 (0.0 ~ 1.0 범위, 예: 0.6 = 60%)")]
-    [Range(0f, 1f)]
-    public float upgradeSuccessRate = 0.6f;
+    [Header("강화 가중치 밸런스 설정 (성공:실패:파괴)")]
+    [Tooltip("강화 성공 가중치 (기본: 3 -> 60%)")]
+    public int successWeight = 3;
 
-    [Tooltip("강화 실패 시 무기가 파괴되지 않고 유지될 확률 (0.0 ~ 1.0). 나머지 확률은 실패(파괴) 처리됩니다.")]
-    [Range(0f, 1f)]
-    public float upgradeKeepRate = 0.25f;
+    [Tooltip("강화 실패(단계 유지) 가중치 (기본: 1 -> 20%)")]
+    public int keepWeight = 1;
+
+    [Tooltip("강화 실패(아이템 파괴) 가중치 (기본: 1 -> 20%)")]
+    public int destroyWeight = 1;
+
+    /// <summary>
+    /// 성공/실패/파괴 가중치의 총합입니다. (3 + 1 + 1 = 5)
+    /// </summary>
+    public int TotalWeight => Mathf.Max(1, successWeight + keepWeight + destroyWeight);
+
+    /// <summary>
+    /// 가중치 기반 성공 확률 비율 (0.0 ~ 1.0)
+    /// </summary>
+    public float upgradeSuccessRate => (float)successWeight / TotalWeight;
+
+    /// <summary>
+    /// 가중치 기반 실패(단계 유지) 확률 비율 (0.0 ~ 1.0)
+    /// </summary>
+    public float upgradeKeepRate => (float)keepWeight / TotalWeight;
+
+    /// <summary>
+    /// 가중치 기반 파괴 확률 비율 (0.0 ~ 1.0)
+    /// </summary>
+    public float upgradeDestroyRate => (float)destroyWeight / TotalWeight;
 
     [Tooltip("강화 시 소모되는 '철 주괴' 개수입니다.")]
     public int requiredIronIngot = 5;

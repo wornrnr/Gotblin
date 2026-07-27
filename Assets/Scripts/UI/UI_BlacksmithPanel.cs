@@ -166,9 +166,9 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
 
         // 3-Color Rates (🟢 초록=성공, 🟡 노랑=유지, 🔴 빨강=파괴)
-        float successRatio = Mathf.Clamp01(weapon.upgradeSuccessRate);
-        float keepRatio = Mathf.Clamp01(weapon.upgradeKeepRate);
-        float destroyRatio = Mathf.Clamp01(1.0f - (successRatio + keepRatio));
+        float successRatio = weapon.upgradeSuccessRate;
+        float keepRatio = weapon.upgradeKeepRate;
+        float destroyRatio = weapon.upgradeDestroyRate;
 
         if (successRateText != null) successRateText.text = $"{Mathf.RoundToInt(successRatio * 100f)}%";
         if (keepRateText != null) keepRateText.text = $"{Mathf.RoundToInt(keepRatio * 100f)}%";
@@ -210,9 +210,9 @@ public class UI_BlacksmithPanel : UI_BasePopup
             weaponGradeLevelText.text = $"Lv.{gem.level}";
         }
 
-        float successRatio = Mathf.Clamp01(gem.upgradeSuccessRate);
-        float keepRatio = Mathf.Clamp01(gem.upgradeKeepRate);
-        float destroyRatio = Mathf.Clamp01(1.0f - (successRatio + keepRatio));
+        float successRatio = gem.upgradeSuccessRate;
+        float keepRatio = gem.upgradeKeepRate;
+        float destroyRatio = gem.upgradeDestroyRate;
 
         if (successRateText != null) successRateText.text = $"{Mathf.RoundToInt(successRatio * 100f)}%";
         if (keepRateText != null) keepRateText.text = $"{Mathf.RoundToInt(keepRatio * 100f)}%";

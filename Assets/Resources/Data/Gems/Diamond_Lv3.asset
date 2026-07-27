@@ -17,6 +17,7 @@ MonoBehaviour:
   level: 3
   iconSprite: {fileID: 0}
   sellPrice: 12000
-  upgradeSuccessRate: 0.1
-  upgradeKeepRate: 0.6
+  successWeight: 3
+  keepWeight: 1
+  destroyWeight: 1
   nextLevelGem: {fileID: 0}

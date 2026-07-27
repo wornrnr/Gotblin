@@ -9,18 +9,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 37ac19c60858c134baed394e5817140e, type: 3}
-  m_Name: axe_1
+  m_Script: {fileID: 11500000, guid: 51efac4d3f51d9340b39ac80dc3e6442, type: 3}
+  m_Name: Emerald_Lv1
   m_EditorClassIdentifier: 
-  weaponID: axe_1
-  weaponName: "\uBC8C\uBAA9\uB3C4\uB07C"
-  weaponType: "\uC804\uD22C\uB3C4\uB07C"
-  grade: 1
-  visualSprite: {fileID: 0}
+  gemID: emerald_1
+  gemName: "\uC5D0\uBA54\uB784\uB4DC 1\uB2E8\uACC4"
+  level: 1
   iconSprite: {fileID: 0}
-  baseATK: 50
+  sellPrice: 800
   successWeight: 3
   keepWeight: 1
   destroyWeight: 1
-  requiredIronIngot: 10
-  nextGradeWeapon: {fileID: 11400000, guid: c2222222222222222222222222222222, type: 2}
+  nextLevelGem: {fileID: 11400000, guid: 350f9ef8f57ec1349909977bc64eb60e, type: 2}
