@@ -213,13 +213,37 @@ public class UI_WorldBuildingObject : MonoBehaviour
             var bInst = cachedInstance != null ? cachedInstance : BuildingManager.Instance.GetBuildingInstance("Blacksmith");
             if (bInst != null && bInst.currentLevel >= 1 && !bInst.isConstructing)
             {
+                // 1. 씬 Canvas 하위에 배치된 UI_BlacksmithPanel 탐색
                 var blacksmithPanel = Object.FindFirstObjectByType<UI_BlacksmithPanel>(FindObjectsInactive.Include);
+                
+                // 2. 씬에 미배치된 경우 Resources/Prefab/UI_BlacksmithPanel 또는 Resources/UI_BlacksmithPanel 프리팹 자동 인스턴스화
+                if (blacksmithPanel == null)
+                {
+                    GameObject prefabObj = Resources.Load<GameObject>("Prefab/UI_BlacksmithPanel");
+                    if (prefabObj == null) prefabObj = Resources.Load<GameObject>("UI_BlacksmithPanel");
+
+                    if (prefabObj != null)
+                    {
+                        Canvas mainCanvas = Object.FindFirstObjectByType<Canvas>();
+                        if (mainCanvas != null)
+                        {
+                            GameObject instObj = Object.Instantiate(prefabObj, mainCanvas.transform, false);
+                            blacksmithPanel = instObj.GetComponent<UI_BlacksmithPanel>();
+                            Debug.Log("<color=cyan>[UI_WorldBuildingObject] Resources의 UI_BlacksmithPanel 프리팹을 Canvas에 자동 생성하였습니다.</color>");
+                        }
+                    }
+                }
+
                 if (blacksmithPanel != null)
                 {
                     blacksmithPanel.gameObject.SetActive(true);
                     blacksmithPanel.RefreshAllUI();
                     Debug.Log("<color=green>[UI_WorldBuildingObject] 완공된 대장간 팝업 UI를 엽니다!</color>");
                     return;
+                }
+                else
+                {
+                    Debug.LogWarning("[UI_WorldBuildingObject] 씬 Canvas 및 Resources 폴더에서 UI_BlacksmithPanel 프리팹을 찾을 수 없습니다! Canvas 하위에 배치하거나 Resources/Prefab/UI_BlacksmithPanel 에셋으로 저장해 주세요.");
                 }
             }
         }
