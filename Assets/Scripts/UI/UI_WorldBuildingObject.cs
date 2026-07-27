@@ -207,44 +207,36 @@ public class UI_WorldBuildingObject : MonoBehaviour
 
         Debug.Log($"[UI_WorldBuildingObject] {buildingID} 클릭됨. 업그레이드/건설 시작을 요청합니다.");
         
-        // [대장간 특수 연동]: 대장간(Blacksmith)이 이미 건설 완료(Lv >= 1)된 상태에서 클릭 시 대장간 팝업 UI 오픈
-        if (buildingID == "Blacksmith")
+        // [전역 다중 팝업 아키텍처 연동]: 완공(Lv >= 1)된 건물을 클릭했을 때 대응하는 팝업 UI(PopupManager)를 자동으로 오픈합니다.
+        if (cachedInstance != null && cachedInstance.currentLevel >= 1 && !cachedInstance.isConstructing)
         {
-            var bInst = cachedInstance != null ? cachedInstance : BuildingManager.Instance.GetBuildingInstance("Blacksmith");
-            if (bInst != null && bInst.currentLevel >= 1 && !bInst.isConstructing)
+            if (PopupManager.Instance != null && PopupManager.Instance.HasPopup(buildingID))
             {
-                // 1. 씬 Canvas 하위에 배치된 UI_BlacksmithPanel 탐색
-                var blacksmithPanel = Object.FindFirstObjectByType<UI_BlacksmithPanel>(FindObjectsInactive.Include);
-                
-                // 2. 씬에 미배치된 경우 Resources/Prefab/UI_BlacksmithPanel 또는 Resources/UI_BlacksmithPanel 프리팹 자동 인스턴스화
-                if (blacksmithPanel == null)
+                bool opened = PopupManager.Instance.OpenPopup(buildingID);
+                if (opened)
                 {
-                    GameObject prefabObj = Resources.Load<GameObject>("Prefab/UI_BlacksmithPanel");
-                    if (prefabObj == null) prefabObj = Resources.Load<GameObject>("UI_BlacksmithPanel");
-
-                    if (prefabObj != null)
-                    {
-                        Canvas mainCanvas = Object.FindFirstObjectByType<Canvas>();
-                        if (mainCanvas != null)
-                        {
-                            GameObject instObj = Object.Instantiate(prefabObj, mainCanvas.transform, false);
-                            blacksmithPanel = instObj.GetComponent<UI_BlacksmithPanel>();
-                            Debug.Log("<color=cyan>[UI_WorldBuildingObject] Resources의 UI_BlacksmithPanel 프리팹을 Canvas에 자동 생성하였습니다.</color>");
-                        }
-                    }
-                }
-
-                if (blacksmithPanel != null)
-                {
-                    blacksmithPanel.gameObject.SetActive(true);
-                    blacksmithPanel.RefreshAllUI();
-                    Debug.Log("<color=green>[UI_WorldBuildingObject] 완공된 대장간 팝업 UI를 엽니다!</color>");
+                    Debug.Log($"<color=green>[UI_WorldBuildingObject] 건물 '{buildingID}'의 팝업 UI를 PopupManager를 통해 엽니다!</color>");
                     return;
                 }
-                else
+            }
+
+            // 폴백: PopupManager 미등록 시 direct 탐색
+            UI_BasePopup targetPopup = null;
+            UI_BasePopup[] popups = Object.FindObjectsByType<UI_BasePopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var pop in popups)
+            {
+                if (pop != null && (pop.popupID == buildingID || (buildingID == "TownHall" && pop.popupID == "HQ")))
                 {
-                    Debug.LogWarning("[UI_WorldBuildingObject] 씬 Canvas 및 Resources 폴더에서 UI_BlacksmithPanel 프리팹을 찾을 수 없습니다! Canvas 하위에 배치하거나 Resources/Prefab/UI_BlacksmithPanel 에셋으로 저장해 주세요.");
+                    targetPopup = pop;
+                    break;
                 }
+            }
+
+            if (targetPopup != null)
+            {
+                targetPopup.OpenPopup();
+                Debug.Log($"<color=green>[UI_WorldBuildingObject] 건물 '{buildingID}'의 팝업 UI를 직접 활성화하였습니다.</color>");
+                return;
             }
         }
 

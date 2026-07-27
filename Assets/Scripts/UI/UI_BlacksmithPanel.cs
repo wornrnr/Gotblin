@@ -8,8 +8,14 @@ using UnityEngine.UI;
 /// 불꽃 이펙트(UI_BlacksmithEmberFX) 및 무기/보석 탭 전환 및 강화를 지원합니다.
 /// </summary>
 [DisallowMultipleComponent]
-public class UI_BlacksmithPanel : MonoBehaviour
+public class UI_BlacksmithPanel : UI_BasePopup
 {
+    protected override void Awake()
+    {
+        base.Awake();
+        if (string.IsNullOrEmpty(popupID)) popupID = "Blacksmith";
+    }
+
     [Header("해금 및 가림막 UI")]
     [Tooltip("대장간 건물 미건설 시 조작을 막는 해금 경고 가림막 오버레이 패널입니다.")]
     [SerializeField] private GameObject lockedOverlayPanel;
@@ -97,7 +103,7 @@ public class UI_BlacksmithPanel : MonoBehaviour
     /// <summary>
     /// 대장간 해금 유무 체크 및 인벤토리/재화 정보 일괄 UI 갱신
     /// </summary>
-    public void RefreshAllUI()
+    public override void RefreshAllUI()
     {
         bool isUnlocked = BlacksmithManager.Instance != null && BlacksmithManager.Instance.IsBlacksmithUnlocked();
 
