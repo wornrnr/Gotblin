@@ -63,6 +63,8 @@ public class UI_BlacksmithPanel : UI_BasePopup
     // 내부 관리 변수
     private WeaponItemData selectedWeapon;
     private GemItemData selectedGem;
+    private int selectedWeaponIndex = 0;
+    private int selectedGemIndex = 0;
     private bool isWeaponTab = true;
 
     private readonly List<UI_BlacksmithSlot> activeSlots = new List<UI_BlacksmithSlot>();
@@ -76,6 +78,12 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (tab2Btn != null) tab2Btn.onClick.AddListener(SwitchToGemTab);
         if (forgeBtn != null) forgeBtn.onClick.AddListener(OnClickForge);
         if (sellBtn != null) sellBtn.onClick.AddListener(OnClickSell);
+
+        // UI가 새로 켜지면 아무 슬롯도 선택하지 않은 상태
+        selectedWeapon = null;
+        selectedGem = null;
+        selectedWeaponIndex = -1;
+        selectedGemIndex = -1;
 
         SwitchToWeaponTab();
         RefreshAllUI();
@@ -113,25 +121,40 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
         if (isWeaponTab)
         {
-            if (selectedWeapon == null || !BlacksmithManager.Instance.ownedWeapons.Contains(selectedWeapon))
+            BlacksmithManager.Instance.SortWeapons();
+            var weapons = BlacksmithManager.Instance.ownedWeapons;
+            if (weapons.Count == 0 || selectedWeaponIndex < 0 || selectedWeaponIndex >= weapons.Count)
             {
-                selectedWeapon = BlacksmithManager.Instance.equippedWeapon;
+                selectedWeaponIndex = -1;
+                selectedWeapon = null;
+            }
+            else
+            {
+                selectedWeapon = weapons[selectedWeaponIndex];
             }
             RefreshWeaponDetail(selectedWeapon);
             BuildWeaponGrid();
         }
         else
         {
-            if (selectedGem == null || !BlacksmithManager.Instance.ownedGems.Contains(selectedGem))
+            BlacksmithManager.Instance.SortGems();
+            var gems = BlacksmithManager.Instance.ownedGems;
+            if (gems.Count == 0 || selectedGemIndex < 0 || selectedGemIndex >= gems.Count)
             {
-                if (BlacksmithManager.Instance.ownedGems.Count > 0)
-                    selectedGem = BlacksmithManager.Instance.ownedGems[0];
-                else
-                    selectedGem = null;
+                selectedGemIndex = -1;
+                selectedGem = null;
+            }
+            else
+            {
+                selectedGem = gems[selectedGemIndex];
             }
             RefreshGemDetail(selectedGem);
             BuildGemGrid();
         }
+
+        bool hasSelection = isWeaponTab ? (selectedWeapon != null) : (selectedGem != null);
+        if (forgeBtn != null) forgeBtn.interactable = hasSelection;
+        if (sellBtn != null) sellBtn.interactable = hasSelection;
     }
 
     /// <summary>
@@ -141,6 +164,11 @@ public class UI_BlacksmithPanel : UI_BasePopup
     {
         if (weapon == null)
         {
+            if (equippedWeaponIcon != null)
+            {
+                equippedWeaponIcon.sprite = null;
+                equippedWeaponIcon.gameObject.SetActive(false);
+            }
             if (equippedWeaponNameText != null) equippedWeaponNameText.text = "선택된 무기 없음";
             if (weaponGradeLevelText != null) weaponGradeLevelText.text = "+0";
             if (successRateText != null) successRateText.text = "0%";
@@ -186,6 +214,11 @@ public class UI_BlacksmithPanel : UI_BasePopup
     {
         if (gem == null)
         {
+            if (equippedWeaponIcon != null)
+            {
+                equippedWeaponIcon.sprite = null;
+                equippedWeaponIcon.gameObject.SetActive(false);
+            }
             if (equippedWeaponNameText != null) equippedWeaponNameText.text = "선택된 보석 없음";
             if (weaponGradeLevelText != null) weaponGradeLevelText.text = "Lv.0";
             if (successRateText != null) successRateText.text = "0%";
@@ -237,8 +270,8 @@ public class UI_BlacksmithPanel : UI_BasePopup
         {
             WeaponItemData wData = i < weapons.Count ? weapons[i] : null;
             UI_BlacksmithSlot slot = Instantiate(slotPrefab, inventoryGridContainer);
-            bool isSelected = (wData != null && wData == selectedWeapon);
-            slot.Setup(wData, isSelected, OnSlotSelected);
+            bool isSelected = (wData != null && i == selectedWeaponIndex);
+            slot.Setup(wData, i, isSelected, OnSlotSelected);
             activeSlots.Add(slot);
         }
     }
@@ -258,8 +291,8 @@ public class UI_BlacksmithPanel : UI_BasePopup
         {
             GemItemData gData = i < gems.Count ? gems[i] : null;
             UI_BlacksmithSlot slot = Instantiate(slotPrefab, inventoryGridContainer);
-            bool isSelected = (gData != null && gData == selectedGem);
-            slot.SetupGem(gData, isSelected, OnSlotSelected);
+            bool isSelected = (gData != null && i == selectedGemIndex);
+            slot.SetupGem(gData, i, isSelected, OnSlotSelected);
             activeSlots.Add(slot);
         }
     }
@@ -279,7 +312,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
         {
             if (slot.BoundWeapon != null)
             {
-                selectedWeapon = slot.BoundWeapon;
+                selectedWeaponIndex = slot.SlotIndex;
                 RefreshAllUI();
             }
         }
@@ -287,7 +320,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
         {
             if (slot.BoundGem != null)
             {
-                selectedGem = slot.BoundGem;
+                selectedGemIndex = slot.SlotIndex;
                 RefreshAllUI();
             }
         }
@@ -298,6 +331,8 @@ public class UI_BlacksmithPanel : UI_BasePopup
     public void SwitchToWeaponTab()
     {
         isWeaponTab = true;
+        selectedWeapon = null;
+        selectedWeaponIndex = -1;
         if (tab1Highlight != null) tab1Highlight.gameObject.SetActive(true);
         if (tab2Highlight != null) tab2Highlight.gameObject.SetActive(false);
         RefreshAllUI();
@@ -306,6 +341,8 @@ public class UI_BlacksmithPanel : UI_BasePopup
     public void SwitchToGemTab()
     {
         isWeaponTab = false;
+        selectedGem = null;
+        selectedGemIndex = -1;
         if (tab1Highlight != null) tab1Highlight.gameObject.SetActive(false);
         if (tab2Highlight != null) tab2Highlight.gameObject.SetActive(true);
         RefreshAllUI();
@@ -322,16 +359,56 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
         if (isWeaponTab)
         {
-            if (selectedWeapon == null) return;
+            if (selectedWeapon == null || selectedWeaponIndex < 0) return;
+            if (selectedWeapon.nextGradeWeapon == null)
+            {
+                UI_ToastPopup.Show("Notice_Max_Upgrade");
+                return;
+            }
+
+            WeaponItemData nextWeapon = selectedWeapon.nextGradeWeapon;
             bool useProtection = useProtectionToggle != null && useProtectionToggle.isOn;
-            WeaponEnhanceResult result = BlacksmithManager.Instance.EnhanceWeapon(selectedWeapon, useProtection);
-            if (result == WeaponEnhanceResult.DestroyedFailure) selectedWeapon = null;
+            WeaponEnhanceResult result = BlacksmithManager.Instance.EnhanceWeaponAtIndex(selectedWeaponIndex, useProtection);
+
+            if (result == WeaponEnhanceResult.Success)
+            {
+                // 성공 시 강화되어 변경된 무기를 정렬된 리스트에서 찾아 계속 선택 상태 유지
+                int newIndex = BlacksmithManager.Instance.ownedWeapons.IndexOf(nextWeapon);
+                selectedWeaponIndex = newIndex;
+                selectedWeapon = (newIndex >= 0) ? nextWeapon : null;
+            }
+            else if (result == WeaponEnhanceResult.DestroyedFailure)
+            {
+                // 파괴 시 선택 해제 (아무 슬롯도 선택하지 않음)
+                selectedWeapon = null;
+                selectedWeaponIndex = -1;
+            }
         }
         else
         {
-            if (selectedGem == null) return;
-            GemEnhanceResult result = BlacksmithManager.Instance.EnhanceGem(selectedGem);
-            if (result == GemEnhanceResult.Destroyed) selectedGem = null;
+            if (selectedGem == null || selectedGemIndex < 0) return;
+            if (selectedGem.nextLevelGem == null)
+            {
+                UI_ToastPopup.Show("Notice_Max_Upgrade");
+                return;
+            }
+
+            GemItemData nextGem = selectedGem.nextLevelGem;
+            GemEnhanceResult result = BlacksmithManager.Instance.EnhanceGemAtIndex(selectedGemIndex);
+
+            if (result == GemEnhanceResult.Success)
+            {
+                // 성공 시 강화되어 변경된 보석을 정렬된 리스트에서 찾아 계속 선택 상태 유지
+                int newIndex = BlacksmithManager.Instance.ownedGems.IndexOf(nextGem);
+                selectedGemIndex = newIndex;
+                selectedGem = (newIndex >= 0) ? nextGem : null;
+            }
+            else if (result == GemEnhanceResult.Destroyed)
+            {
+                // 파괴 시 선택 해제 (아무 슬롯도 선택하지 않음)
+                selectedGem = null;
+                selectedGemIndex = -1;
+            }
         }
 
         RefreshAllUI();
@@ -343,14 +420,17 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
         if (isWeaponTab)
         {
-            if (selectedWeapon == null) return;
+            if (selectedWeapon == null || selectedWeaponIndex < 0) return;
             Debug.Log($"[UI_BlacksmithPanel] 무기 판매: {selectedWeapon.weaponName}");
+            selectedWeapon = null;
+            selectedWeaponIndex = -1;
         }
         else
         {
-            if (selectedGem == null) return;
-            BlacksmithManager.Instance.SellGem(selectedGem);
+            if (selectedGem == null || selectedGemIndex < 0) return;
+            BlacksmithManager.Instance.SellGemAtIndex(selectedGemIndex);
             selectedGem = null;
+            selectedGemIndex = -1;
         }
 
         RefreshAllUI();

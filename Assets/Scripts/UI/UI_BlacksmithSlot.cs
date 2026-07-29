@@ -16,6 +16,7 @@ public class UI_BlacksmithSlot : MonoBehaviour
 
     public WeaponItemData BoundWeapon { get; private set; }
     public GemItemData BoundGem { get; private set; }
+    public int SlotIndex { get; private set; } = -1;
 
     private Action<UI_BlacksmithSlot> onClickCallback;
 
@@ -31,10 +32,11 @@ public class UI_BlacksmithSlot : MonoBehaviour
     /// <summary>
     /// 무기 데이터 바인딩
     /// </summary>
-    public void Setup(WeaponItemData weapon, bool isSelected, Action<UI_BlacksmithSlot> onClick)
+    public void Setup(WeaponItemData weapon, int slotIndex, bool isSelected, Action<UI_BlacksmithSlot> onClick)
     {
         BoundWeapon = weapon;
         BoundGem = null;
+        SlotIndex = slotIndex;
         onClickCallback = onClick;
 
         if (weapon != null)
@@ -62,10 +64,11 @@ public class UI_BlacksmithSlot : MonoBehaviour
     /// <summary>
     /// 보석 데이터 바인딩
     /// </summary>
-    public void SetupGem(GemItemData gem, bool isSelected, Action<UI_BlacksmithSlot> onClick)
+    public void SetupGem(GemItemData gem, int slotIndex, bool isSelected, Action<UI_BlacksmithSlot> onClick)
     {
         BoundGem = gem;
         BoundWeapon = null;
+        SlotIndex = slotIndex;
         onClickCallback = onClick;
 
         if (gem != null)

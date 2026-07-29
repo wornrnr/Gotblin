@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 51efac4d3f51d9340b39ac80dc3e6442, type: 3}
-  m_Name: Diamond_Lv3
+  m_Name: Diamond_Lv4
   m_EditorClassIdentifier: 
-  gemID: diamond_3
-  gemName: "\uCC2C\uB780\uD55C \uB2E4\uC774\uC544\uBAAC\uB4DC 3\uB2E8\uACC4"
-  level: 3
-  iconSprite: {fileID: 21300000, guid: 8813b52fcb7e2ec4fa19651e37d0267d, type: 3}
+  gemID: diamond_4
+  gemName: "\uCC2C\uB780\uD55C \uB2E4\uC774\uC544\uBAAC\uB4DC 4\uB2E8\uACC4"
+  level: 4
+  iconSprite: {fileID: 21300000, guid: e848ad46f1fb99e4eaf20867bba9276d, type: 3}
   sellPrice: 12000
   successWeight: 3
   keepWeight: 1
   destroyWeight: 1
-  nextLevelGem: {fileID: 11400000, guid: 3ef0c7b6d0243c5449919cfc33e17be4, type: 2}
+  nextLevelGem: {fileID: 11400000, guid: 1ce3bfa5b75458e4190b64324c9cadcd, type: 2}

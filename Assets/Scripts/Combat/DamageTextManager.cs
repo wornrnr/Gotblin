@@ -58,7 +58,11 @@ public class DamageTextManager : MonoBehaviour
         // 1. 폰트 에셋 자동 탐색 (미지정 시)
         if (fontAsset == null)
         {
-            fontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+            fontAsset = Resources.Load<TMP_FontAsset>("NeoDunggeunmoPro-Regular SDF");
+            if (fontAsset == null)
+            {
+                fontAsset = TMPro.TMP_Settings.defaultFontAsset;
+            }
             if (fontAsset == null)
             {
                 TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();

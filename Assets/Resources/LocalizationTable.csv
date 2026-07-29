@@ -10,3 +10,5 @@ GraphGame_Count,남은 고블린 수,Goblins,残りのゴブリン数
 Chapter_Name_0,고블린 숲,Goblin Forest,ゴブリンの森
 Chapter_Name_1,어둠의 동굴,Dark Cave,闇の洞窟
 Chapter_Name_2,고블린 요새,Goblin Fortress,ゴブリンの要塞
+Notice_Max_Upgrade,더 이상 강화할 수 없습니다.,Max Upgrade,これ以上強化できません。
+Notice_No_Currency,재화가 부족합니다.,Not enough currency,通貨が不足しています。

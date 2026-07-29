@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public enum WeaponEnhanceResult
@@ -37,8 +38,6 @@ public struct CalculatedWeaponStats
 [DisallowMultipleComponent]
 public class BlacksmithManager : MonoBehaviour
 {
-    public static BlacksmithManager Instance { get; private set; }
-
     [Header("건물 연동 식별 ID")]
     [Tooltip("BuildingManager에서 참조할 대장간 건물의 고유 ID입니다.")]
     public string blacksmithBuildingID = "Blacksmith";
@@ -63,18 +62,90 @@ public class BlacksmithManager : MonoBehaviour
     // 무기/보석 상태 변경 이벤트
     public static event Action OnInventoryUpdated;
     public static event Action OnEquippedWeaponChanged;
+    private static BlacksmithManager _instance;
+
+    public static BlacksmithManager Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                _instance = UnityEngine.Object.FindFirstObjectByType<BlacksmithManager>();
+                if (_instance == null)
+                {
+                    GameObject go = new GameObject("BlacksmithManager");
+                    _instance = go.AddComponent<BlacksmithManager>();
+                }
+            }
+            return _instance;
+        }
+        private set
+        {
+            _instance = value;
+        }
+    }
 
     private void Awake()
     {
-        if (Instance == null)
+        if (_instance == null)
         {
-            Instance = this;
+            _instance = this;
             DontDestroyOnLoad(gameObject);
+            InitDefaultTestItems();
         }
-        else if (Instance != this)
+        else if (_instance != this)
         {
             Destroy(gameObject);
         }
+    }
+
+    /// <summary>
+    /// 테스트용: 게임 시작 시 기본적으로 Diamond_Lv1을 5개 소지하도록 초기화합니다.
+    /// </summary>
+    private void InitDefaultTestItems()
+    {
+        GemItemData diamondLv1 = Resources.Load<GemItemData>("Data/Gems/Diamond_Lv1");
+        if (diamondLv1 != null)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                ownedGems.Add(diamondLv1);
+            }
+            SortGems();
+            OnInventoryUpdated?.Invoke();
+        }
+        else
+        {
+            Debug.LogWarning("[BlacksmithManager] Resources/Data/Gems/Diamond_Lv1 에셋을 로드할 수 없습니다.");
+        }
+    }
+
+    /// <summary>
+    /// 보유 보석 리스트를 정렬 규칙에 맞춰 정렬합니다.
+    /// (규칙: 1. 레벨 내림차순, 2. gemID 오름차순, 3. 기존 생성 순서 유지)
+    /// </summary>
+    public void SortGems()
+    {
+        if (ownedGems == null || ownedGems.Count <= 1) return;
+
+        ownedGems = ownedGems
+            .OrderByDescending(g => g != null ? g.level : -1)
+            .ThenBy(g => g != null ? g.gemID : string.Empty)
+            .ToList();
+    }
+
+    /// <summary>
+    /// 보유 무기 리스트를 정렬 규칙에 맞춰 정렬합니다.
+    /// (규칙: 1. 등급 내림차순, 2. weaponID 오름차순, 3. 기존 생성 순서 유지)
+    /// </summary>
+    public void SortWeapons()
+    {
+        if (ownedWeapons == null || ownedWeapons.Count <= 1) return;
+
+        ownedWeapons = ownedWeapons
+            .OrderByDescending(w => w != null ? w.grade : -1)
+            .ThenBy(w => w != null ? w.weaponID : string.Empty)
+            .ToList();
     }
 
     /// <summary>
@@ -98,6 +169,7 @@ public class BlacksmithManager : MonoBehaviour
         if (weapon != null && !ownedWeapons.Contains(weapon))
         {
             ownedWeapons.Add(weapon);
+            SortWeapons();
         }
 
         equippedWeapon = weapon;
@@ -108,24 +180,27 @@ public class BlacksmithManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// 무기를 대장간에서 강화 처리합니다 (철 주괴 소모 ➡️ 성공/유지/실패 확률 및 파괴 방지 연동)
-    /// </summary>
     public WeaponEnhanceResult EnhanceWeapon(WeaponItemData weapon, bool useProtectionItem)
     {
+        int idx = ownedWeapons.IndexOf(weapon);
+        if (idx >= 0) return EnhanceWeaponAtIndex(idx, useProtectionItem);
+        return WeaponEnhanceResult.Keep;
+    }
+
+    public WeaponEnhanceResult EnhanceWeaponAtIndex(int index, bool useProtectionItem)
+    {
+        if (index < 0 || index >= ownedWeapons.Count) return WeaponEnhanceResult.Keep;
+        WeaponItemData weapon = ownedWeapons[index];
         if (weapon == null) return WeaponEnhanceResult.Keep;
 
-        // 1. 철 주괴 수량 검증
         if (ironIngotCount < weapon.requiredIronIngot)
         {
             Debug.LogWarning($"[BlacksmithManager] 철 주괴가 부족합니다! (필요: {weapon.requiredIronIngot}, 보유: {ironIngotCount})");
             return WeaponEnhanceResult.Keep;
         }
 
-        // 2. 철 주괴 차감
         ironIngotCount -= weapon.requiredIronIngot;
 
-        // 3. 가중치 기반 강화 확률 연산 (성공 : 실패/유지 : 파괴)
         int totalWeight = weapon.TotalWeight;
         int rnd = UnityEngine.Random.Range(0, totalWeight);
 
@@ -133,22 +208,12 @@ public class BlacksmithManager : MonoBehaviour
 
         if (rnd < weapon.successWeight)
         {
-            // [성공]: 다음 단계 무기로 인벤토리 교체
             result = WeaponEnhanceResult.Success;
             if (weapon.nextGradeWeapon != null)
             {
                 WeaponItemData nextWeapon = weapon.nextGradeWeapon;
-                int idx = ownedWeapons.IndexOf(weapon);
-                if (idx >= 0)
-                {
-                    ownedWeapons[idx] = nextWeapon;
-                }
-                else
-                {
-                    ownedWeapons.Add(nextWeapon);
-                }
+                ownedWeapons[index] = nextWeapon;
 
-                // 장착 중이던 무기였다면 자동으로 다음 단계 무기로 장착 동기화
                 if (equippedWeapon == weapon)
                 {
                     equippedWeapon = nextWeapon;
@@ -158,21 +223,19 @@ public class BlacksmithManager : MonoBehaviour
         }
         else if (rnd < weapon.successWeight + weapon.keepWeight)
         {
-            // [실패 / 유지]: 현재 단계를 유지 (변화 없음)
             result = WeaponEnhanceResult.Keep;
         }
         else
         {
-            // [파괴]: 무기를 인벤토리에서 소멸 처리 (파괴 방지권 사용 시 보존)
             if (useProtectionItem && protectionItemCount > 0)
             {
                 protectionItemCount--;
-                result = WeaponEnhanceResult.ProtectedFailure; // 파괴 방지 보존
+                result = WeaponEnhanceResult.ProtectedFailure;
             }
             else
             {
-                result = WeaponEnhanceResult.DestroyedFailure; // 파괴 소멸
-                ownedWeapons.Remove(weapon);
+                result = WeaponEnhanceResult.DestroyedFailure;
+                ownedWeapons.RemoveAt(index);
 
                 if (equippedWeapon == weapon)
                 {
@@ -182,15 +245,22 @@ public class BlacksmithManager : MonoBehaviour
             }
         }
 
+        SortWeapons();
         OnInventoryUpdated?.Invoke();
         return result;
     }
 
-    /// <summary>
-    /// 보석을 대장간에서 강화 처리합니다. (가중치 기반: 성공 / 유지 / 파괴)
-    /// </summary>
     public GemEnhanceResult EnhanceGem(GemItemData gem)
     {
+        int idx = ownedGems.IndexOf(gem);
+        if (idx >= 0) return EnhanceGemAtIndex(idx);
+        return GemEnhanceResult.Keep;
+    }
+
+    public GemEnhanceResult EnhanceGemAtIndex(int index)
+    {
+        if (index < 0 || index >= ownedGems.Count) return GemEnhanceResult.Keep;
+        GemItemData gem = ownedGems[index];
         if (gem == null) return GemEnhanceResult.Keep;
 
         int totalWeight = gem.TotalWeight;
@@ -203,15 +273,7 @@ public class BlacksmithManager : MonoBehaviour
             result = GemEnhanceResult.Success;
             if (gem.nextLevelGem != null)
             {
-                int idx = ownedGems.IndexOf(gem);
-                if (idx >= 0)
-                {
-                    ownedGems[idx] = gem.nextLevelGem;
-                }
-                else
-                {
-                    ownedGems.Add(gem.nextLevelGem);
-                }
+                ownedGems[index] = gem.nextLevelGem;
             }
         }
         else if (rnd < gem.successWeight + gem.keepWeight)
@@ -221,19 +283,26 @@ public class BlacksmithManager : MonoBehaviour
         else
         {
             result = GemEnhanceResult.Destroyed;
-            ownedGems.Remove(gem);
+            ownedGems.RemoveAt(index);
         }
 
+        SortGems();
         OnInventoryUpdated?.Invoke();
         return result;
     }
 
-    /// <summary>
-    /// 보석을 지정된 판매가 골드로 판매하고 인벤토리에서 제거합니다.
-    /// </summary>
     public bool SellGem(GemItemData gem)
     {
-        if (gem == null || !ownedGems.Contains(gem)) return false;
+        int idx = ownedGems.IndexOf(gem);
+        if (idx >= 0) return SellGemAtIndex(idx);
+        return false;
+    }
+
+    public bool SellGemAtIndex(int index)
+    {
+        if (index < 0 || index >= ownedGems.Count) return false;
+        GemItemData gem = ownedGems[index];
+        if (gem == null) return false;
 
         int earnGold = Mathf.Max(0, gem.sellPrice);
         if (CurrencyManager.Instance != null)
@@ -241,7 +310,8 @@ public class BlacksmithManager : MonoBehaviour
             CurrencyManager.Instance.AddGold(earnGold);
         }
 
-        ownedGems.Remove(gem);
+        ownedGems.RemoveAt(index);
+        SortGems();
         OnInventoryUpdated?.Invoke();
         return true;
     }

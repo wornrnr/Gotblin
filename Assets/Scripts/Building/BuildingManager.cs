@@ -173,6 +173,7 @@ public class BuildingManager : MonoBehaviour
             if (!CurrencyManager.Instance.ConsumeGold(requiredGold))
             {
                 Debug.LogWarning($"[BuildingManager] 골드가 부족하여 건설을 시작할 수 없습니다. (필요 골드: {requiredGold:N0} G)");
+                UI_ToastPopup.Show("Notice_No_Currency");
                 return;
             }
         }

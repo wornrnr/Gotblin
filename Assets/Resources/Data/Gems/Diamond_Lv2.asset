@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 51efac4d3f51d9340b39ac80dc3e6442, type: 3}
-  m_Name: diamond_2
+  m_Name: Diamond_Lv2
   m_EditorClassIdentifier: 
   gemID: diamond_2
   gemName: "\uB2E4\uC774\uC544\uBAAC\uB4DC 2\uB2E8\uACC4"
   level: 2
-  iconSprite: {fileID: 0}
+  iconSprite: {fileID: 21300000, guid: 60abbdc04171c2f4ea8392c734f20d80, type: 3}
   sellPrice: 5000
   successWeight: 3
   keepWeight: 1
