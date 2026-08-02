@@ -106,13 +106,16 @@ public class GoldJuiceSpawner : MonoBehaviour
     {
         if (goblinTransform == null || pool == null) return;
 
-        // 고블린의 현재 로컬 앵커 좌표에 오프셋 값을 보정하여 적용
-        Vector2 spawnPos = goblinTransform.anchoredPosition + spawnOffset;
+        // 사용자의 피드백을 반영하여 복잡한 좌표 변환을 배제하고,
+        // 고블린 프리팹의 X, Y 좌표(Pivot 기준)에 인스펙터의 오프셋을 단순하게 더하는 방식으로 최적화
+        Vector2 spawnPos = new Vector2(
+            goblinTransform.anchoredPosition.x + spawnOffset.x,
+            goblinTransform.anchoredPosition.y + spawnOffset.y
+        );
 
         UI_GoldParticle particle = pool.Get();
         if (particle != null)
         {
-            // 발진시키며 스스로 반환할 때의 Callback Action을 주입합니다.
             particle.Launch(spawnPos, ReleaseParticleToPool);
         }
     }

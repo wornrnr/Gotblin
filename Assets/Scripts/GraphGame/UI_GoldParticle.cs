@@ -33,6 +33,11 @@ public class UI_GoldParticle : MonoBehaviour
     /// </summary>
     /// <param name="startPosition">고블린의 실시간 anchoredPosition 좌표</param>
     /// <param name="onRelease">연출이 완료되었을 때 풀로 복귀시키기 위한 반환 콜백</param>
+    /// <summary>
+    /// 고블린의 위치에서 골드를 공중으로 무작위 포물선을 그리며 투척합니다.
+    /// </summary>
+    /// <param name="startPosition">고블린의 실시간 anchoredPosition 좌표</param>
+    /// <param name="onRelease">연출이 완료되었을 때 풀로 복귀시키기 위한 반환 콜백</param>
     public void Launch(Vector2 startPosition, Action<UI_GoldParticle> onRelease)
     {
         if (rectTransform == null) rectTransform = GetComponent<RectTransform>();

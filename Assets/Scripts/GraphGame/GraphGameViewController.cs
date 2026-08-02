@@ -83,6 +83,13 @@ public class GraphGameViewController : MonoBehaviour
         }
 
         UpdateAttemptsUI();
+
+        // 5. BannerSubTxt 진동 및 파편 Juice 연출 컨트롤러 자동 바인딩
+        if (bannerSubText != null && bannerSubText.GetComponent<BannerSubTxtJuiceController>() == null)
+        {
+            bannerSubText.gameObject.AddComponent<BannerSubTxtJuiceController>();
+        }
+
         RefreshUI(gameManager.CurrentState);
     }
 
