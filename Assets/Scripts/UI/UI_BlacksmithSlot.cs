@@ -19,14 +19,27 @@ public class UI_BlacksmithSlot : MonoBehaviour
     public int SlotIndex { get; private set; } = -1;
 
     private Action<UI_BlacksmithSlot> onClickCallback;
+    private Coroutine scaleTweenCoroutine;
+    private Vector3 originalScale = Vector3.one;
 
     private void Awake()
     {
+        originalScale = transform.localScale;
         if (slotButton == null) slotButton = GetComponent<Button>();
         if (slotButton != null)
         {
             slotButton.onClick.AddListener(OnSlotClicked);
         }
+    }
+
+    private void OnDisable()
+    {
+        if (scaleTweenCoroutine != null)
+        {
+            StopCoroutine(scaleTweenCoroutine);
+            scaleTweenCoroutine = null;
+        }
+        transform.localScale = originalScale;
     }
 
     /// <summary>
@@ -103,6 +116,55 @@ public class UI_BlacksmithSlot : MonoBehaviour
 
     private void OnSlotClicked()
     {
+        PlayTouchScaleTween();
         onClickCallback?.Invoke(this);
+    }
+
+    /// <summary>
+    /// 터치/클릭 시 0.88배로 작아졌다가 원래 크기로 돌아오는 트위닝 연출
+    /// </summary>
+    public void PlayTouchScaleTween()
+    {
+        if (!gameObject.activeInHierarchy) return;
+
+        if (scaleTweenCoroutine != null)
+        {
+            StopCoroutine(scaleTweenCoroutine);
+        }
+        scaleTweenCoroutine = StartCoroutine(CoTouchScaleTween());
+    }
+
+    private System.Collections.IEnumerator CoTouchScaleTween()
+    {
+        Vector3 targetCompressScale = originalScale * 0.88f; // 작아짐
+        float compressDuration = 0.06f; // 0.06초 축소
+        float returnDuration = 0.12f;   // 0.12초 복원
+        float elapsed = 0f;
+
+        // 1. 1.0 -> 0.88 축소
+        while (elapsed < compressDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / compressDuration);
+            float easeT = 1f - (1f - t) * (1f - t); // EaseOutQuad
+            transform.localScale = Vector3.Lerp(originalScale, targetCompressScale, easeT);
+            yield return null;
+        }
+
+        transform.localScale = targetCompressScale;
+        elapsed = 0f;
+
+        // 2. 0.88 -> 1.0 원래 크기로 복원
+        while (elapsed < returnDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / returnDuration);
+            float easeT = t * t * (3f - 2f * t); // SmoothStep
+            transform.localScale = Vector3.Lerp(targetCompressScale, originalScale, easeT);
+            yield return null;
+        }
+
+        transform.localScale = originalScale;
+        scaleTweenCoroutine = null;
     }
 }

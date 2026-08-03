@@ -43,11 +43,14 @@ public class UI_BlacksmithPanel : UI_BasePopup
     [Header("Middle Inventory Grid Section (5x3 Grid)")]
     [SerializeField] private Transform inventoryGridContainer;
     [SerializeField] private UI_BlacksmithSlot slotPrefab;
+    [SerializeField] private TextMeshProUGUI emptyNoticeText;
 
     [Header("Lower Action Buttons (Sell & Forge)")]
     [SerializeField] private Button sellBtn;
+    [SerializeField] private TextMeshProUGUI sellBtnLabelText;
     [SerializeField] private TextMeshProUGUI sellGoldText;
     [SerializeField] private Button forgeBtn;
+    [SerializeField] private TextMeshProUGUI forgeBtnLabelText;
     [SerializeField] private TextMeshProUGUI forgeGoldText;
 
     [Header("Bottom Navigation Tabs (Tab 1: Weapon / Tab 2: Gem)")]
@@ -59,6 +62,10 @@ public class UI_BlacksmithPanel : UI_BasePopup
     [Header("기타 파티클 및 옵션")]
     [SerializeField] private UI_BlacksmithEmberFX emberFX;
     [SerializeField] private Toggle useProtectionToggle;
+
+    [Header("치트 버튼 참조 (선택 사항)")]
+    [SerializeField] private Button cheatAllWeaponsBtn;
+    [SerializeField] private Button cheatAllGemsBtn;
 
     // 내부 관리 변수
     private WeaponItemData selectedWeapon;
@@ -79,6 +86,13 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (forgeBtn != null) forgeBtn.onClick.AddListener(OnClickForge);
         if (sellBtn != null) sellBtn.onClick.AddListener(OnClickSell);
 
+        if (cheatAllWeaponsBtn != null) cheatAllWeaponsBtn.onClick.AddListener(OnCheatAllWeaponsClicked);
+        if (cheatAllGemsBtn != null) cheatAllGemsBtn.onClick.AddListener(OnCheatAllGemsClicked);
+
+        InitButtonLabels();
+        AttachButtonTweenEffects();
+        SetupGridScrollAndMask();
+
         // UI가 새로 켜지면 아무 슬롯도 선택하지 않은 상태
         selectedWeapon = null;
         selectedGem = null;
@@ -87,6 +101,160 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
         SwitchToWeaponTab();
         RefreshAllUI();
+    }
+
+    /// <summary>
+    /// InventoryGridSection 및 InventoryGridContainer에 RectMask2D, ScrollRect, ContentSizeFitter를 자동 세팅하여
+    /// 영역 이탈 마스킹 및 상하 스크롤 기능을 보장합니다.
+    /// </summary>
+    private void SetupGridScrollAndMask()
+    {
+        if (inventoryGridContainer == null) return;
+
+        RectTransform containerRect = inventoryGridContainer as RectTransform;
+        if (containerRect == null) containerRect = inventoryGridContainer.GetComponent<RectTransform>();
+
+        Transform sectionTransform = inventoryGridContainer.parent;
+        if (sectionTransform == null) return;
+
+        RectTransform sectionRect = sectionTransform as RectTransform;
+
+        // 1. InventoryGridSection (부모 영역)에 RectMask2D 및 ScrollRect 추가/설정
+        RectMask2D mask = sectionTransform.GetComponent<RectMask2D>();
+        if (mask == null)
+        {
+            mask = sectionTransform.gameObject.AddComponent<RectMask2D>();
+        }
+
+        ScrollRect scrollRect = sectionTransform.GetComponent<ScrollRect>();
+        if (scrollRect == null)
+        {
+            scrollRect = sectionTransform.gameObject.AddComponent<ScrollRect>();
+        }
+
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.content = containerRect;
+        scrollRect.viewport = sectionRect;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.elasticity = 0.1f;
+        scrollRect.scrollSensitivity = 25f;
+
+        // 2. InventoryGridContainer (자식 컨텐츠) Anchor & Pivot 및 너비 설정 (상단 중앙 기준)
+        if (containerRect != null)
+        {
+            containerRect.anchorMin = new Vector2(0.5f, 1f);
+            containerRect.anchorMax = new Vector2(0.5f, 1f);
+            containerRect.pivot = new Vector2(0.5f, 1f);
+            containerRect.anchoredPosition = new Vector2(0f, 0f);
+
+            if (sectionRect != null && sectionRect.rect.width > 0)
+            {
+                containerRect.sizeDelta = new Vector2(sectionRect.rect.width, containerRect.sizeDelta.y);
+            }
+        }
+
+        // 3. GridLayoutGroup 및 ContentSizeFitter 설정 (상단 중앙 정렬 보장)
+        GridLayoutGroup gridLayout = inventoryGridContainer.GetComponent<GridLayoutGroup>();
+        if (gridLayout != null)
+        {
+            gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gridLayout.constraintCount = 5; // 5열 고정
+            gridLayout.childAlignment = TextAnchor.UpperLeft; // 슬롯 좌측 상단 정렬
+        }
+
+        ContentSizeFitter csf = inventoryGridContainer.GetComponent<ContentSizeFitter>();
+        if (csf == null)
+        {
+            csf = inventoryGridContainer.gameObject.AddComponent<ContentSizeFitter>();
+        }
+        csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+    }
+
+    /// <summary>
+    /// SellButton, ForgeButton, Tab1Button, Tab2Button에 클릭/터치 스케일 트위닝 연출 컴포넌트를 부착합니다.
+    /// </summary>
+    private void AttachButtonTweenEffects()
+    {
+        EnsureTweenEffect(sellBtn);
+        EnsureTweenEffect(forgeBtn);
+        EnsureTweenEffect(tab1Btn);
+        EnsureTweenEffect(tab2Btn);
+    }
+
+    private void EnsureTweenEffect(Button btn)
+    {
+        if (btn != null && btn.GetComponent<UI_ButtonTweenEffect>() == null)
+        {
+            btn.gameObject.AddComponent<UI_ButtonTweenEffect>();
+        }
+    }
+
+    /// <summary>
+    /// SellButton 및 ForgeButton의 LabelText에 각각 "ui_sell_btn"(판매), "ui_forge_btn"(강화) 다국어를 바인딩하고 GoldText 위치를 탐색합니다.
+    /// </summary>
+    private void InitButtonLabels()
+    {
+        // 1. Sell Button Label ("ui_sell_btn" -> "판매") 및 GoldText 바인딩
+        if (sellBtn != null)
+        {
+            if (sellBtnLabelText == null)
+            {
+                Transform labelTr = sellBtn.transform.Find("LabelText");
+                if (labelTr != null) sellBtnLabelText = labelTr.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (sellGoldText == null)
+            {
+                Transform goldBadgeTr = sellBtn.transform.Find("GoldBadge");
+                if (goldBadgeTr != null)
+                {
+                    Transform goldTextTr = goldBadgeTr.Find("GoldText");
+                    if (goldTextTr != null) sellGoldText = goldTextTr.GetComponent<TextMeshProUGUI>();
+                }
+            }
+        }
+
+        if (sellBtnLabelText != null)
+        {
+            string sellText = "판매";
+            if (LocalizationManager.Instance != null && LocalizationManager.Instance.HasKey("ui_sell_btn"))
+            {
+                sellText = LocalizationManager.Instance.GetLocalizedString("ui_sell_btn");
+            }
+            sellBtnLabelText.text = sellText;
+        }
+
+        // 2. Forge Button Label ("ui_forge_btn" -> "강화") 및 GoldText 바인딩
+        if (forgeBtn != null)
+        {
+            if (forgeBtnLabelText == null)
+            {
+                Transform labelTr = forgeBtn.transform.Find("LabelText");
+                if (labelTr != null) forgeBtnLabelText = labelTr.GetComponent<TextMeshProUGUI>();
+            }
+
+            if (forgeGoldText == null)
+            {
+                Transform goldBadgeTr = forgeBtn.transform.Find("GoldBadge");
+                if (goldBadgeTr != null)
+                {
+                    Transform goldTextTr = goldBadgeTr.Find("GoldText");
+                    if (goldTextTr != null) forgeGoldText = goldTextTr.GetComponent<TextMeshProUGUI>();
+                }
+            }
+        }
+
+        if (forgeBtnLabelText != null)
+        {
+            string forgeText = "강화";
+            if (LocalizationManager.Instance != null && LocalizationManager.Instance.HasKey("ui_forge_btn"))
+            {
+                forgeText = LocalizationManager.Instance.GetLocalizedString("ui_forge_btn");
+            }
+            forgeBtnLabelText.text = forgeText;
+        }
     }
 
     private void OnDisable()
@@ -98,6 +266,25 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (tab2Btn != null) tab2Btn.onClick.RemoveListener(SwitchToGemTab);
         if (forgeBtn != null) forgeBtn.onClick.RemoveListener(OnClickForge);
         if (sellBtn != null) sellBtn.onClick.RemoveListener(OnClickSell);
+
+        if (cheatAllWeaponsBtn != null) cheatAllWeaponsBtn.onClick.RemoveListener(OnCheatAllWeaponsClicked);
+        if (cheatAllGemsBtn != null) cheatAllGemsBtn.onClick.RemoveListener(OnCheatAllGemsClicked);
+    }
+
+    private void OnCheatAllWeaponsClicked()
+    {
+        if (BlacksmithManager.Instance != null)
+        {
+            BlacksmithManager.Instance.AddAllWeaponsCheat();
+        }
+    }
+
+    private void OnCheatAllGemsClicked()
+    {
+        if (BlacksmithManager.Instance != null)
+        {
+            BlacksmithManager.Instance.AddAllGemsCheat();
+        }
     }
 
     /// <summary>
@@ -202,9 +389,9 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (keepRateText != null) keepRateText.text = $"{Mathf.RoundToInt(keepRatio * 100f)}%";
         if (destroyRateText != null) destroyRateText.text = $"{Mathf.RoundToInt(destroyRatio * 100f)}%";
 
-        // 버튼 비용 뱃지 갱신
-        if (forgeGoldText != null) forgeGoldText.text = "5,000";
-        if (sellGoldText != null) sellGoldText.text = "2,500";
+        // 버튼 비용 및 판매가 뱃지 갱신
+        if (forgeGoldText != null) forgeGoldText.text = $"{weapon.enhanceCost:N0}";
+        if (sellGoldText != null) sellGoldText.text = $"{weapon.sellPrice:N0}";
     }
 
     /// <summary>
@@ -251,24 +438,33 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (keepRateText != null) keepRateText.text = $"{Mathf.RoundToInt(keepRatio * 100f)}%";
         if (destroyRateText != null) destroyRateText.text = $"{Mathf.RoundToInt(destroyRatio * 100f)}%";
 
-        if (forgeGoldText != null) forgeGoldText.text = "3,000";
+        // 버튼 비용 및 판매가 뱃지 갱신
+        if (forgeGoldText != null) forgeGoldText.text = $"{gem.enhanceCost:N0}";
         if (sellGoldText != null) sellGoldText.text = $"{gem.sellPrice:N0}";
     }
 
     /// <summary>
-    /// 5x3 그리드 무기 인벤토리 슬롯 생성 및 갱신
+    /// 5x3 그리드 무기 인벤토리 슬롯 생성 및 갱신 (데이터가 없는 경우 슬롯 없이 안내 문구 출력)
     /// </summary>
     private void BuildWeaponGrid()
     {
         ClearGridSlots();
-        if (inventoryGridContainer == null || slotPrefab == null || BlacksmithManager.Instance == null) return;
+        if (inventoryGridContainer == null || BlacksmithManager.Instance == null) return;
 
         var weapons = BlacksmithManager.Instance.ownedWeapons;
-        int totalSlots = Mathf.Max(15, weapons.Count); // 최소 15개 슬롯 (5x3)
-
-        for (int i = 0; i < totalSlots; i++)
+        if (weapons == null || weapons.Count == 0)
         {
-            WeaponItemData wData = i < weapons.Count ? weapons[i] : null;
+            UpdateEmptyNoticeText(true);
+            return;
+        }
+
+        UpdateEmptyNoticeText(false);
+
+        if (slotPrefab == null) return;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            WeaponItemData wData = weapons[i];
             UI_BlacksmithSlot slot = Instantiate(slotPrefab, inventoryGridContainer);
             bool isSelected = (wData != null && i == selectedWeaponIndex);
             slot.Setup(wData, i, isSelected, OnSlotSelected);
@@ -277,23 +473,93 @@ public class UI_BlacksmithPanel : UI_BasePopup
     }
 
     /// <summary>
-    /// 5x3 그리드 보석 인벤토리 슬롯 생성 및 갱신
+    /// 5x3 그리드 보석 인벤토리 슬롯 생성 및 갱신 (데이터가 없는 경우 슬롯 없이 안내 문구 출력)
     /// </summary>
     private void BuildGemGrid()
     {
         ClearGridSlots();
-        if (inventoryGridContainer == null || slotPrefab == null || BlacksmithManager.Instance == null) return;
+        if (inventoryGridContainer == null || BlacksmithManager.Instance == null) return;
 
         var gems = BlacksmithManager.Instance.ownedGems;
-        int totalSlots = Mathf.Max(15, gems.Count);
-
-        for (int i = 0; i < totalSlots; i++)
+        if (gems == null || gems.Count == 0)
         {
-            GemItemData gData = i < gems.Count ? gems[i] : null;
+            UpdateEmptyNoticeText(true);
+            return;
+        }
+
+        UpdateEmptyNoticeText(false);
+
+        if (slotPrefab == null) return;
+
+        for (int i = 0; i < gems.Count; i++)
+        {
+            GemItemData gData = gems[i];
             UI_BlacksmithSlot slot = Instantiate(slotPrefab, inventoryGridContainer);
             bool isSelected = (gData != null && i == selectedGemIndex);
             slot.SetupGem(gData, i, isSelected, OnSlotSelected);
             activeSlots.Add(slot);
+        }
+    }
+
+    /// <summary>
+    /// 인벤토리가 비어있을 때 표시할 중앙 안내 텍스트("Notice_No_Items")의 상태를 갱신합니다.
+    /// </summary>
+    private void UpdateEmptyNoticeText(bool isEmpty)
+    {
+        if (emptyNoticeText == null && inventoryGridContainer != null)
+        {
+            Transform parentTransform = inventoryGridContainer.parent != null ? inventoryGridContainer.parent : inventoryGridContainer;
+            Transform existingText = parentTransform.Find("EmptyNoticeText");
+            if (existingText != null)
+            {
+                emptyNoticeText = existingText.GetComponent<TextMeshProUGUI>();
+            }
+            else
+            {
+                GameObject textGO = new GameObject("EmptyNoticeText");
+                textGO.transform.SetParent(parentTransform, false);
+
+                RectTransform rectTransform = textGO.AddComponent<RectTransform>();
+                rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                rectTransform.anchoredPosition = Vector2.zero;
+                rectTransform.sizeDelta = new Vector2(400f, 60f);
+
+                emptyNoticeText = textGO.AddComponent<TextMeshProUGUI>();
+                emptyNoticeText.alignment = TextAlignmentOptions.Center;
+                emptyNoticeText.enableAutoSizing = true;
+                emptyNoticeText.fontSizeMin = 14;
+                emptyNoticeText.fontSizeMax = 32;
+                emptyNoticeText.fontSize = 24;
+                emptyNoticeText.color = new Color(0.8f, 0.8f, 0.8f, 1f);
+                if (TMPro.TMP_Settings.defaultFontAsset != null)
+                {
+                    emptyNoticeText.font = TMPro.TMP_Settings.defaultFontAsset;
+                }
+            }
+        }
+
+        if (emptyNoticeText != null)
+        {
+            emptyNoticeText.enableAutoSizing = true;
+            emptyNoticeText.fontSizeMin = 14;
+            emptyNoticeText.fontSizeMax = 32;
+
+            if (isEmpty)
+            {
+                string msg = "아이템이 없습니다.";
+                if (LocalizationManager.Instance != null && LocalizationManager.Instance.HasKey("Notice_No_Items"))
+                {
+                    msg = LocalizationManager.Instance.GetLocalizedString("Notice_No_Items");
+                }
+                emptyNoticeText.text = msg;
+                emptyNoticeText.gameObject.SetActive(true);
+            }
+            else
+            {
+                emptyNoticeText.gameObject.SetActive(false);
+            }
         }
     }
 
@@ -313,7 +579,10 @@ public class UI_BlacksmithPanel : UI_BasePopup
             if (slot.BoundWeapon != null)
             {
                 selectedWeaponIndex = slot.SlotIndex;
-                RefreshAllUI();
+                selectedWeapon = slot.BoundWeapon;
+                RefreshWeaponDetail(selectedWeapon);
+                UpdateSlotHighlightBorders();
+                UpdateActionButtonsState();
             }
         }
         else
@@ -321,9 +590,31 @@ public class UI_BlacksmithPanel : UI_BasePopup
             if (slot.BoundGem != null)
             {
                 selectedGemIndex = slot.SlotIndex;
-                RefreshAllUI();
+                selectedGem = slot.BoundGem;
+                RefreshGemDetail(selectedGem);
+                UpdateSlotHighlightBorders();
+                UpdateActionButtonsState();
             }
         }
+    }
+
+    private void UpdateSlotHighlightBorders()
+    {
+        int targetSelectedIndex = isWeaponTab ? selectedWeaponIndex : selectedGemIndex;
+        for (int i = 0; i < activeSlots.Count; i++)
+        {
+            if (activeSlots[i] != null)
+            {
+                activeSlots[i].SetSelected(activeSlots[i].SlotIndex == targetSelectedIndex);
+            }
+        }
+    }
+
+    private void UpdateActionButtonsState()
+    {
+        bool hasSelection = isWeaponTab ? (selectedWeapon != null) : (selectedGem != null);
+        if (forgeBtn != null) forgeBtn.interactable = hasSelection;
+        if (sellBtn != null) sellBtn.interactable = hasSelection;
     }
 
     #region Tab & Action Handlers
@@ -372,14 +663,18 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
             if (result == WeaponEnhanceResult.Success)
             {
-                // 성공 시 강화되어 변경된 무기를 정렬된 리스트에서 찾아 계속 선택 상태 유지
+                UI_ToastPopup.Show("Notice_Enhance_Success");
                 int newIndex = BlacksmithManager.Instance.ownedWeapons.IndexOf(nextWeapon);
                 selectedWeaponIndex = newIndex;
                 selectedWeapon = (newIndex >= 0) ? nextWeapon : null;
             }
+            else if (result == WeaponEnhanceResult.Keep || result == WeaponEnhanceResult.ProtectedFailure)
+            {
+                UI_ToastPopup.Show("Notice_Enhance_Fail");
+            }
             else if (result == WeaponEnhanceResult.DestroyedFailure)
             {
-                // 파괴 시 선택 해제 (아무 슬롯도 선택하지 않음)
+                UI_ToastPopup.Show("Notice_Enhance_Destroy");
                 selectedWeapon = null;
                 selectedWeaponIndex = -1;
             }
@@ -398,14 +693,18 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
             if (result == GemEnhanceResult.Success)
             {
-                // 성공 시 강화되어 변경된 보석을 정렬된 리스트에서 찾아 계속 선택 상태 유지
+                UI_ToastPopup.Show("Notice_Enhance_Success");
                 int newIndex = BlacksmithManager.Instance.ownedGems.IndexOf(nextGem);
                 selectedGemIndex = newIndex;
                 selectedGem = (newIndex >= 0) ? nextGem : null;
             }
+            else if (result == GemEnhanceResult.Keep)
+            {
+                UI_ToastPopup.Show("Notice_Enhance_Fail");
+            }
             else if (result == GemEnhanceResult.Destroyed)
             {
-                // 파괴 시 선택 해제 (아무 슬롯도 선택하지 않음)
+                UI_ToastPopup.Show("Notice_Enhance_Destroy");
                 selectedGem = null;
                 selectedGemIndex = -1;
             }
@@ -421,7 +720,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (isWeaponTab)
         {
             if (selectedWeapon == null || selectedWeaponIndex < 0) return;
-            Debug.Log($"[UI_BlacksmithPanel] 무기 판매: {selectedWeapon.weaponName}");
+            BlacksmithManager.Instance.SellWeaponAtIndex(selectedWeaponIndex);
             selectedWeapon = null;
             selectedWeaponIndex = -1;
         }

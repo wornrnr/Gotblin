@@ -16,11 +16,12 @@ MonoBehaviour:
   weaponName: "\uC6A9\uC0B4\uAC80 3\uB2E8\uACC4"
   weaponType: "\uC591\uC190\uAC80"
   grade: 3
-  visualSprite: {fileID: 0}
-  iconSprite: {fileID: 0}
+  visualSprite: {fileID: 21300000, guid: 22222222222222222222222222222223, type: 3}
+  iconSprite: {fileID: 21300000, guid: 22222222222222222222222222222223, type: 3}
   baseATK: 160
   successWeight: 3
   keepWeight: 1
   destroyWeight: 1
   requiredIronIngot: 60
   nextGradeWeapon: {fileID: 0}
+

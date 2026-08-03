@@ -101,6 +101,12 @@ public class DamageTextManager : MonoBehaviour
     /// <param name="targetWorldPos">피격당한 유닛의 위치 좌표</param>
     public void ShowDamageText(int amount, bool isHeroAttacking, Vector3 targetWorldPos)
     {
+        // 최적화: 전투 탭 화면이 활성화되지 않은 상태에서는 보이지 않으므로 팝업 연산을 생략합니다.
+        if (MainScreenManager.Instance != null && !MainScreenManager.Instance.IsCombatPanelActive)
+        {
+            return;
+        }
+
         if (textContainer == null)
         {
             InitContainerAndFont();

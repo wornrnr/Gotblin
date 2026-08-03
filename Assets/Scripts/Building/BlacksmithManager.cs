@@ -193,6 +193,15 @@ public class BlacksmithManager : MonoBehaviour
         WeaponItemData weapon = ownedWeapons[index];
         if (weapon == null) return WeaponEnhanceResult.Keep;
 
+        if (CurrencyManager.Instance != null)
+        {
+            if (!CurrencyManager.Instance.ConsumeGold(weapon.enhanceCost))
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
+                return WeaponEnhanceResult.Keep;
+            }
+        }
+
         if (ironIngotCount < weapon.requiredIronIngot)
         {
             Debug.LogWarning($"[BlacksmithManager] 철 주괴가 부족합니다! (필요: {weapon.requiredIronIngot}, 보유: {ironIngotCount})");
@@ -263,6 +272,15 @@ public class BlacksmithManager : MonoBehaviour
         GemItemData gem = ownedGems[index];
         if (gem == null) return GemEnhanceResult.Keep;
 
+        if (CurrencyManager.Instance != null)
+        {
+            if (!CurrencyManager.Instance.ConsumeGold(gem.enhanceCost))
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
+                return GemEnhanceResult.Keep;
+            }
+        }
+
         int totalWeight = gem.TotalWeight;
         int rnd = UnityEngine.Random.Range(0, totalWeight);
 
@@ -291,6 +309,38 @@ public class BlacksmithManager : MonoBehaviour
         return result;
     }
 
+    public bool SellWeapon(WeaponItemData weapon)
+    {
+        int idx = ownedWeapons.IndexOf(weapon);
+        if (idx >= 0) return SellWeaponAtIndex(idx);
+        return false;
+    }
+
+    public bool SellWeaponAtIndex(int index)
+    {
+        if (index < 0 || index >= ownedWeapons.Count) return false;
+        WeaponItemData weapon = ownedWeapons[index];
+        if (weapon == null) return false;
+
+        int earnGold = Mathf.Max(0, weapon.sellPrice);
+        if (CurrencyManager.Instance != null)
+        {
+            CurrencyManager.Instance.AddGold(earnGold);
+        }
+
+        if (equippedWeapon == weapon)
+        {
+            equippedWeapon = null;
+            ApplyHeroStatsAndVisual();
+            OnEquippedWeaponChanged?.Invoke();
+        }
+
+        ownedWeapons.RemoveAt(index);
+        SortWeapons();
+        OnInventoryUpdated?.Invoke();
+        return true;
+    }
+
     public bool SellGem(GemItemData gem)
     {
         int idx = ownedGems.IndexOf(gem);
@@ -315,6 +365,64 @@ public class BlacksmithManager : MonoBehaviour
         OnInventoryUpdated?.Invoke();
         return true;
     }
+
+    #region Cheat Functions
+
+    /// <summary>
+    /// [치트] Resources/Data/Weapons 경로의 모든 무기 아이템을 1개씩 보유 목록에 추가합니다.
+    /// </summary>
+    public void AddAllWeaponsCheat()
+    {
+        WeaponItemData[] weapons = Resources.LoadAll<WeaponItemData>("Data/Weapons");
+        if (weapons == null || weapons.Length == 0)
+        {
+            Debug.LogWarning("[BlacksmithManager] Data/Weapons 경로에서 무기 데이터를 찾을 수 없습니다.");
+            UI_ToastPopup.Show("무기 데이터를 찾지 못했습니다.");
+            return;
+        }
+
+        foreach (var w in weapons)
+        {
+            if (w != null)
+            {
+                ownedWeapons.Add(w);
+            }
+        }
+
+        SortWeapons();
+        OnInventoryUpdated?.Invoke();
+        UI_ToastPopup.Show($"모든 장비 획득 완료! ({weapons.Length}종)");
+        Debug.Log($"<color=cyan>[Cheat] 모든 장비 {weapons.Length}종을 1개씩 획득했습니다.</color>");
+    }
+
+    /// <summary>
+    /// [치트] Resources/Data/Gems 경로의 모든 보석 아이템을 1개씩 보유 목록에 추가합니다.
+    /// </summary>
+    public void AddAllGemsCheat()
+    {
+        GemItemData[] gems = Resources.LoadAll<GemItemData>("Data/Gems");
+        if (gems == null || gems.Length == 0)
+        {
+            Debug.LogWarning("[BlacksmithManager] Data/Gems 경로에서 보석 데이터를 찾을 수 없습니다.");
+            UI_ToastPopup.Show("보석 데이터를 찾지 못했습니다.");
+            return;
+        }
+
+        foreach (var g in gems)
+        {
+            if (g != null)
+            {
+                ownedGems.Add(g);
+            }
+        }
+
+        SortGems();
+        OnInventoryUpdated?.Invoke();
+        UI_ToastPopup.Show($"모든 보석 획득 완료! ({gems.Length}종)");
+        Debug.Log($"<color=cyan>[Cheat] 모든 보석 {gems.Length}종을 1개씩 획득했습니다.</color>");
+    }
+
+    #endregion
 
     /// <summary>
     /// 현재 장착 중인 무기의 기본 옵션(공격력) 및 추가 옵션(공격력%, 타겟수, 공속, 생명력%, 이동속도) 수치를 합산 연산합니다.

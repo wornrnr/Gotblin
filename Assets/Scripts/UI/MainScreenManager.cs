@@ -20,6 +20,12 @@ public class MainScreenManager : MonoBehaviour
     [Tooltip("코어 3: 자동 전투 시스템 화면의 부모 GameObject 패널입니다.")]
     [SerializeField] private GameObject combatPanel;
 
+    /// <summary>
+    /// 현재 전투 시스템 탭이 활성화되어 있는지 여부를 반환합니다.
+    /// (백그라운드 최적화 및 팝업 텍스트 스킵 등에 사용)
+    /// </summary>
+    public bool IsCombatPanelActive { get; private set; }
+
     private void Awake()
     {
         // 싱글톤 이니셜라이즈
@@ -35,13 +41,39 @@ public class MainScreenManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 패널의 상태를 CanvasGroup을 통해 제어합니다.
+    /// GameObject를 끄지 않아 백그라운드 코루틴 및 Update 로직이 계속 동작할 수 있습니다.
+    /// </summary>
+    private void SetPanelActive(GameObject panel, bool isActive)
+    {
+        if (panel == null) return;
+        
+        // 유니티 인스펙터나 이전에 SetActive(false)로 꺼져있었다면 캔버스그룹이 동작하지 않으므로 강제로 켜줍니다.
+        if (!panel.activeSelf)
+        {
+            panel.SetActive(true);
+        }
+
+        CanvasGroup cg = panel.GetComponent<CanvasGroup>();
+        if (cg == null)
+        {
+            cg = panel.AddComponent<CanvasGroup>();
+        }
+
+        cg.alpha = isActive ? 1f : 0f;
+        cg.interactable = isActive;
+        cg.blocksRaycasts = isActive;
+    }
+
+    /// <summary>
     /// 그래프 게임 패널을 켜고 부락 건설 및 전투 패널을 비활성화합니다.
     /// </summary>
     public void SwitchToGraphGame()
     {
-        if (townBuildingPanel != null) townBuildingPanel.SetActive(false);
-        if (combatPanel != null) combatPanel.SetActive(false);
-        if (graphGamePanel != null) graphGamePanel.SetActive(true);
+        IsCombatPanelActive = false;
+        SetPanelActive(townBuildingPanel, false);
+        SetPanelActive(combatPanel, false);
+        SetPanelActive(graphGamePanel, true);
 
         Debug.Log("[MainScreenManager] [코어 1: 그래프 게임] 패널 활성화 완료.");
     }
@@ -51,11 +83,13 @@ public class MainScreenManager : MonoBehaviour
     /// </summary>
     public void SwitchToTownBuilding()
     {
-        if (graphGamePanel != null) graphGamePanel.SetActive(false);
-        if (combatPanel != null) combatPanel.SetActive(false);
+        IsCombatPanelActive = false;
+        SetPanelActive(graphGamePanel, false);
+        SetPanelActive(combatPanel, false);
+        
         if (townBuildingPanel != null)
         {
-            townBuildingPanel.SetActive(true);
+            SetPanelActive(townBuildingPanel, true);
 
             // [대장간 건물 오브젝트 자동 셋업]
             var bsSetup = townBuildingPanel.GetComponent<TownBuildingBlacksmithSetup>();
@@ -84,9 +118,10 @@ public class MainScreenManager : MonoBehaviour
     /// </summary>
     public void SwitchToCombatSystem()
     {
-        if (graphGamePanel != null) graphGamePanel.SetActive(false);
-        if (townBuildingPanel != null) townBuildingPanel.SetActive(false);
-        if (combatPanel != null) combatPanel.SetActive(true);
+        IsCombatPanelActive = true;
+        SetPanelActive(graphGamePanel, false);
+        SetPanelActive(townBuildingPanel, false);
+        SetPanelActive(combatPanel, true);
 
         Debug.Log("[MainScreenManager] [코어 3: 전투 시스템] 패널 활성화 완료.");
     }

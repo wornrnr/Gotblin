@@ -58,6 +58,13 @@ public class WeaponItemData : ScriptableObject
     [Tooltip("[추가 옵션] 등급 및 종류에 따라 추가 부여되는 옵션 목록입니다. (공격력%, 타겟수, 공속, 생명력%, 이동속도)")]
     public List<ItemOption> additionalOptions = new List<ItemOption>();
 
+    [Header("경제 및 강화 비용 밸런스")]
+    [Tooltip("이 무기를 판매했을 때 획득하는 골드 판매가입니다.")]
+    public int sellPrice = 1000;
+
+    [Tooltip("이 무기를 강화할 때 소모되는 골드 비용입니다.")]
+    public int enhanceCost = 3000;
+
     [Header("강화 가중치 밸런스 설정 (성공:실패:파괴)")]
     [Tooltip("강화 성공 가중치 (기본: 3 -> 60%)")]
     public int successWeight = 3;

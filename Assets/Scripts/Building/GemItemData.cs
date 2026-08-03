@@ -23,6 +23,9 @@ public class GemItemData : ScriptableObject
     [Tooltip("이 보석을 판매했을 때 획득하는 골드 판매가입니다.")]
     public int sellPrice = 500;
 
+    [Tooltip("이 보석을 강화할 때 소모되는 골드 비용입니다.")]
+    public int enhanceCost = 1500;
+
     [Header("강화 가중치 밸런스 설정 (성공:실패:파괴)")]
     [Tooltip("강화 성공 가중치 (기본: 3 -> 60%)")]
     public int successWeight = 3;

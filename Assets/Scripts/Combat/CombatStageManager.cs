@@ -110,6 +110,7 @@ public class CombatStageManager : MonoBehaviour
         SetChallengeButtonActive(true);
     }
 
+
     private void Update()
     {
         // 1. [카메라 팔로우 및 Clamp 제약 기능]: 트랜지션(카메라 강제 연출 중)이 아닐 때만 영웅 추적을 수행
