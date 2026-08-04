@@ -61,6 +61,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
     [Header("기타 파티클 및 옵션")]
     [SerializeField] private UI_BlacksmithEmberFX emberFX;
+    [SerializeField] private UI_BlacksmithVisualController visualController;
     [SerializeField] private Toggle useProtectionToggle;
 
     [Header("치트 버튼 참조 (선택 사항)")]
@@ -92,6 +93,21 @@ public class UI_BlacksmithPanel : UI_BasePopup
         InitButtonLabels();
         AttachButtonTweenEffects();
         SetupGridScrollAndMask();
+
+        if (visualController == null && leftVisualPanel != null)
+        {
+            visualController = leftVisualPanel.GetComponent<UI_BlacksmithVisualController>();
+            if (visualController == null)
+            {
+                visualController = leftVisualPanel.gameObject.AddComponent<UI_BlacksmithVisualController>();
+            }
+        }
+        if (visualController != null)
+        {
+            visualController.EnsureComponentReferences();
+            visualController.LoadSpritesIfNull();
+            visualController.StartIdleAnimation();
+        }
 
         // UI가 새로 켜지면 아무 슬롯도 선택하지 않은 상태
         selectedWeapon = null;
@@ -610,17 +626,21 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
     }
 
+    private bool isEnhancing = false;
+
     private void UpdateActionButtonsState()
     {
         bool hasSelection = isWeaponTab ? (selectedWeapon != null) : (selectedGem != null);
-        if (forgeBtn != null) forgeBtn.interactable = hasSelection;
-        if (sellBtn != null) sellBtn.interactable = hasSelection;
+        bool canInteract = hasSelection && !isEnhancing;
+        if (forgeBtn != null) forgeBtn.interactable = canInteract;
+        if (sellBtn != null) sellBtn.interactable = canInteract;
     }
 
     #region Tab & Action Handlers
 
     public void SwitchToWeaponTab()
     {
+        if (isEnhancing) return;
         isWeaponTab = true;
         selectedWeapon = null;
         selectedWeaponIndex = -1;
@@ -631,6 +651,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
     public void SwitchToGemTab()
     {
+        if (isEnhancing) return;
         isWeaponTab = false;
         selectedGem = null;
         selectedGemIndex = -1;
@@ -641,12 +662,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
     private void OnClickForge()
     {
-        if (BlacksmithManager.Instance == null) return;
-
-        if (emberFX != null)
-        {
-            emberFX.TriggerEnhanceSparkFX();
-        }
+        if (isEnhancing || BlacksmithManager.Instance == null) return;
 
         if (isWeaponTab)
         {
@@ -656,12 +672,67 @@ public class UI_BlacksmithPanel : UI_BasePopup
                 UI_ToastPopup.Show("Notice_Max_Upgrade");
                 return;
             }
+        }
+        else
+        {
+            if (selectedGem == null || selectedGemIndex < 0) return;
+            if (selectedGem.nextLevelGem == null)
+            {
+                UI_ToastPopup.Show("Notice_Max_Upgrade");
+                return;
+            }
+        }
+
+        if (visualController == null && leftVisualPanel != null)
+        {
+            visualController = leftVisualPanel.GetComponent<UI_BlacksmithVisualController>();
+        }
+
+        isEnhancing = true;
+        UpdateActionButtonsState();
+
+        System.Action onStrike = () =>
+        {
+            if (emberFX != null) emberFX.TriggerEnhanceSparkFX();
+        };
+
+        System.Action onComplete = () =>
+        {
+            ExecuteEnhancementOutcome();
+            isEnhancing = false;
+            RefreshAllUI();
+        };
+
+        if (visualController != null)
+        {
+            visualController.PlayEnhanceHammerSequence(onStrike, onComplete);
+        }
+        else
+        {
+            onStrike();
+            onComplete();
+        }
+    }
+
+    private void ExecuteEnhancementOutcome()
+    {
+        if (BlacksmithManager.Instance == null) return;
+
+        if (isWeaponTab)
+        {
+            if (selectedWeapon == null || selectedWeaponIndex < 0) return;
 
             WeaponItemData nextWeapon = selectedWeapon.nextGradeWeapon;
             bool useProtection = useProtectionToggle != null && useProtectionToggle.isOn;
+
             WeaponEnhanceResult result = BlacksmithManager.Instance.EnhanceWeaponAtIndex(selectedWeaponIndex, useProtection);
 
-            if (result == WeaponEnhanceResult.Success)
+            if (result == WeaponEnhanceResult.NotEnoughCurrency)
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
+                return;
+            }
+            else if (result == WeaponEnhanceResult.Success)
             {
                 UI_ToastPopup.Show("Notice_Enhance_Success");
                 int newIndex = BlacksmithManager.Instance.ownedWeapons.IndexOf(nextWeapon);
@@ -682,16 +753,16 @@ public class UI_BlacksmithPanel : UI_BasePopup
         else
         {
             if (selectedGem == null || selectedGemIndex < 0) return;
-            if (selectedGem.nextLevelGem == null)
-            {
-                UI_ToastPopup.Show("Notice_Max_Upgrade");
-                return;
-            }
 
             GemItemData nextGem = selectedGem.nextLevelGem;
             GemEnhanceResult result = BlacksmithManager.Instance.EnhanceGemAtIndex(selectedGemIndex);
 
-            if (result == GemEnhanceResult.Success)
+            if (result == GemEnhanceResult.NotEnoughCurrency)
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
+                return;
+            }
+            else if (result == GemEnhanceResult.Success)
             {
                 UI_ToastPopup.Show("Notice_Enhance_Success");
                 int newIndex = BlacksmithManager.Instance.ownedGems.IndexOf(nextGem);
@@ -709,8 +780,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
                 selectedGemIndex = -1;
             }
         }
-
-        RefreshAllUI();
     }
 
     private void OnClickSell()

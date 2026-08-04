@@ -5,17 +5,19 @@ using UnityEngine;
 
 public enum WeaponEnhanceResult
 {
-    Success,           // 강화 성공 (다음 단계로 변경)
-    Keep,              // 변화 없음 (단계 유지)
-    ProtectedFailure,  // 실패하였으나 파괴 방지권 사용으로 파괴 소멸 방지됨
-    DestroyedFailure   // 실패하여 무기가 완전히 파괴 소멸됨
+    Success,           // 강화 성공 (다음 단계로 진입)
+    Keep,              // 강화 실패 (단계 유지)
+    ProtectedFailure,  // 확률에 의해 파괴될 뻔 했으나 보호권으로 유지
+    DestroyedFailure,  // 확률에 의해 파괴되어 소멸됨
+    NotEnoughCurrency  // 재화 부족
 }
 
 public enum GemEnhanceResult
 {
     Success,   // 강화 성공
-    Keep,      // 변화 없음
-    Destroyed  // 파괴 소멸
+    Keep,      // 강화 실패
+    Destroyed, // 파괴되어 소멸됨
+    NotEnoughCurrency // 재화 부족
 }
 
 /// <summary>
@@ -197,15 +199,14 @@ public class BlacksmithManager : MonoBehaviour
         {
             if (!CurrencyManager.Instance.ConsumeGold(weapon.enhanceCost))
             {
-                UI_ToastPopup.Show("Notice_No_Currency");
-                return WeaponEnhanceResult.Keep;
+                return WeaponEnhanceResult.NotEnoughCurrency;
             }
         }
 
         if (ironIngotCount < weapon.requiredIronIngot)
         {
-            Debug.LogWarning($"[BlacksmithManager] 철 주괴가 부족합니다! (필요: {weapon.requiredIronIngot}, 보유: {ironIngotCount})");
-            return WeaponEnhanceResult.Keep;
+            Debug.LogWarning($"[BlacksmithManager] 철 주괴가 부족합니다! (필요: {weapon.requiredIronIngot}, 현재: {ironIngotCount})");
+            return WeaponEnhanceResult.NotEnoughCurrency;
         }
 
         ironIngotCount -= weapon.requiredIronIngot;
@@ -276,8 +277,7 @@ public class BlacksmithManager : MonoBehaviour
         {
             if (!CurrencyManager.Instance.ConsumeGold(gem.enhanceCost))
             {
-                UI_ToastPopup.Show("Notice_No_Currency");
-                return GemEnhanceResult.Keep;
+                return GemEnhanceResult.NotEnoughCurrency;
             }
         }
 
