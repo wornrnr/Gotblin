@@ -104,7 +104,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
         if (visualController != null)
         {
-            visualController.EnsureComponentReferences();
             visualController.LoadSpritesIfNull();
             visualController.StartIdleAnimation();
         }

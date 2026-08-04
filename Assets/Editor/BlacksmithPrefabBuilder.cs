@@ -8,6 +8,8 @@ public static class BlacksmithPrefabBuilder
     [MenuItem("Gotblin/Build Blacksmith Popup Prefab")]
     public static void BuildPrefab()
     {
+        BlacksmithVisualSpriteGenerator.GenerateAssets();
+
         // 1. Root GameObject 생성 (전체 화면 Stretch Canvas Overlay)
         GameObject root = new GameObject("UI_BlacksmithPanel", typeof(RectTransform), typeof(CanvasGroup), typeof(UI_BlacksmithPanel));
         RectTransform rootRect = root.GetComponent<RectTransform>();
@@ -73,7 +75,7 @@ public static class BlacksmithPrefabBuilder
         upperRect.anchoredPosition = new Vector2(0, -80);
         upperRect.sizeDelta = new Vector2(-20, 230);
 
-        // Left Visual Panel (Ember FX & Large Preview)
+        // Left Visual Panel (Ember FX & Large Preview & Goblin Smith Visual)
         GameObject leftVisualObj = CreateUIElement("LeftVisualPanel", upperSplitObj.transform);
         RectTransform leftRect = leftVisualObj.GetComponent<RectTransform>();
         leftRect.anchorMin = new Vector2(0, 0);
@@ -83,6 +85,64 @@ public static class BlacksmithPrefabBuilder
 
         Image leftBg = leftVisualObj.AddComponent<Image>();
         leftBg.color = new Color(0.12f, 0.12f, 0.12f, 1f);
+        leftVisualObj.AddComponent<RectMask2D>();
+
+        // Load default sprites for the builder
+        Sprite bgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Sprite/Blacksmith_Interior_BG.png");
+        Sprite anvilSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Resources/Sprite/Blacksmith_Anvil.png");
+        
+        Object[] goblinSprites = AssetDatabase.LoadAllAssetsAtPath("Assets/Resources/Sprite/Goblin_Blacksmith_Sheet.png");
+        Sprite goblinIdle0 = null;
+        if (goblinSprites != null)
+        {
+            foreach (var obj in goblinSprites)
+            {
+                if (obj is Sprite s && s.name.EndsWith("_0")) { goblinIdle0 = s; break; }
+                else if (obj is Sprite s2 && goblinIdle0 == null) goblinIdle0 = s2; // fallback
+            }
+        }
+
+        // Visual Background Image
+        GameObject visualBgObj = CreateUIElement("VisualBG", leftVisualObj.transform);
+        SetFullStretch(visualBgObj.GetComponent<RectTransform>());
+        Image visualBgImg = visualBgObj.AddComponent<Image>();
+        visualBgImg.color = Color.white;
+        visualBgImg.sprite = bgSprite;
+
+        // Visual Anvil Image
+        GameObject visualAnvilObj = CreateUIElement("VisualAnvil", leftVisualObj.transform);
+        RectTransform anvilRect = visualAnvilObj.GetComponent<RectTransform>();
+        anvilRect.anchorMin = new Vector2(0.6f, 0.1f);
+        anvilRect.anchorMax = new Vector2(0.6f, 0.1f);
+        anvilRect.pivot = new Vector2(0.5f, 0f);
+        anvilRect.sizeDelta = new Vector2(56, 56);
+        anvilRect.anchoredPosition = Vector2.zero;
+        Image visualAnvilImg = visualAnvilObj.AddComponent<Image>();
+        visualAnvilImg.color = Color.white;
+        visualAnvilImg.sprite = anvilSprite;
+
+        // Visual Goblin Image
+        GameObject visualGoblinObj = CreateUIElement("VisualGoblin", leftVisualObj.transform);
+        RectTransform goblinRect = visualGoblinObj.GetComponent<RectTransform>();
+        goblinRect.anchorMin = new Vector2(0.25f, 0.1f);
+        goblinRect.anchorMax = new Vector2(0.25f, 0.1f);
+        goblinRect.pivot = new Vector2(0.5f, 0f);
+        goblinRect.sizeDelta = new Vector2(72, 72);
+        goblinRect.anchoredPosition = Vector2.zero;
+        Image visualGoblinImg = visualGoblinObj.AddComponent<Image>();
+        visualGoblinImg.color = Color.white;
+        visualGoblinImg.sprite = goblinIdle0;
+
+        // Visual Controller Component
+        UI_BlacksmithVisualController visualCtrl = leftVisualObj.AddComponent<UI_BlacksmithVisualController>();
+        SerializedObject serializedVC = new SerializedObject(visualCtrl);
+        serializedVC.FindProperty("bgImage").objectReferenceValue = visualBgImg;
+        serializedVC.FindProperty("anvilImage").objectReferenceValue = visualAnvilImg;
+        serializedVC.FindProperty("goblinImage").objectReferenceValue = visualGoblinImg;
+        serializedVC.ApplyModifiedProperties();
+
+        serializedPanel.FindProperty("leftVisualPanel").objectReferenceValue = leftRect;
+        serializedPanel.FindProperty("visualController").objectReferenceValue = visualCtrl;
 
         // Ember Container & FX
         GameObject emberContainerObj = CreateUIElement("EmberContainer", leftVisualObj.transform);
