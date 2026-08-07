@@ -658,7 +658,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (tab2Highlight != null) tab2Highlight.gameObject.SetActive(true);
         RefreshAllUI();
     }
-
     private void OnClickForge()
     {
         if (isEnhancing || BlacksmithManager.Instance == null) return;
@@ -671,6 +670,13 @@ public class UI_BlacksmithPanel : UI_BasePopup
                 UI_ToastPopup.Show("Notice_Max_Upgrade");
                 return;
             }
+            
+            // 재화 사전 체크 및 차감
+            if (!BlacksmithManager.Instance.TryConsumeWeaponEnhanceCost(selectedWeaponIndex))
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
+                return;
+            }
         }
         else
         {
@@ -678,6 +684,13 @@ public class UI_BlacksmithPanel : UI_BasePopup
             if (selectedGem.nextLevelGem == null)
             {
                 UI_ToastPopup.Show("Notice_Max_Upgrade");
+                return;
+            }
+
+            // 재화 사전 체크 및 차감
+            if (!BlacksmithManager.Instance.TryConsumeGemEnhanceCost(selectedGemIndex))
+            {
+                UI_ToastPopup.Show("Notice_No_Currency");
                 return;
             }
         }
@@ -697,7 +710,55 @@ public class UI_BlacksmithPanel : UI_BasePopup
 
         System.Action onComplete = () =>
         {
-            ExecuteEnhancementOutcome();
+            // 연출 종료 후 실제 강화 확률 굴림 및 인벤토리 갱신
+            if (isWeaponTab)
+            {
+                WeaponItemData nextWeapon = selectedWeapon.nextGradeWeapon;
+                bool useProtection = useProtectionToggle != null && useProtectionToggle.isOn;
+                WeaponEnhanceResult weaponResult = BlacksmithManager.Instance.ExecuteWeaponEnhance(selectedWeaponIndex, useProtection);
+
+                if (weaponResult == WeaponEnhanceResult.Success)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Success");
+                    int newIndex = BlacksmithManager.Instance.ownedWeapons.IndexOf(nextWeapon);
+                    selectedWeaponIndex = newIndex;
+                    selectedWeapon = (newIndex >= 0) ? nextWeapon : null;
+                }
+                else if (weaponResult == WeaponEnhanceResult.Keep || weaponResult == WeaponEnhanceResult.ProtectedFailure)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Fail");
+                }
+                else if (weaponResult == WeaponEnhanceResult.DestroyedFailure)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Destroy");
+                    selectedWeapon = null;
+                    selectedWeaponIndex = -1;
+                }
+            }
+            else
+            {
+                GemItemData nextGem = selectedGem.nextLevelGem;
+                GemEnhanceResult gemResult = BlacksmithManager.Instance.ExecuteGemEnhance(selectedGemIndex);
+
+                if (gemResult == GemEnhanceResult.Success)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Success");
+                    int newIndex = BlacksmithManager.Instance.ownedGems.IndexOf(nextGem);
+                    selectedGemIndex = newIndex;
+                    selectedGem = (newIndex >= 0) ? nextGem : null;
+                }
+                else if (gemResult == GemEnhanceResult.Keep)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Fail");
+                }
+                else if (gemResult == GemEnhanceResult.Destroyed)
+                {
+                    UI_ToastPopup.Show("Notice_Enhance_Destroy");
+                    selectedGem = null;
+                    selectedGemIndex = -1;
+                }
+            }
+
             isEnhancing = false;
             RefreshAllUI();
         };
@@ -710,74 +771,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
         {
             onStrike();
             onComplete();
-        }
-    }
-
-    private void ExecuteEnhancementOutcome()
-    {
-        if (BlacksmithManager.Instance == null) return;
-
-        if (isWeaponTab)
-        {
-            if (selectedWeapon == null || selectedWeaponIndex < 0) return;
-
-            WeaponItemData nextWeapon = selectedWeapon.nextGradeWeapon;
-            bool useProtection = useProtectionToggle != null && useProtectionToggle.isOn;
-
-            WeaponEnhanceResult result = BlacksmithManager.Instance.EnhanceWeaponAtIndex(selectedWeaponIndex, useProtection);
-
-            if (result == WeaponEnhanceResult.NotEnoughCurrency)
-            {
-                UI_ToastPopup.Show("Notice_No_Currency");
-                return;
-            }
-            else if (result == WeaponEnhanceResult.Success)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Success");
-                int newIndex = BlacksmithManager.Instance.ownedWeapons.IndexOf(nextWeapon);
-                selectedWeaponIndex = newIndex;
-                selectedWeapon = (newIndex >= 0) ? nextWeapon : null;
-            }
-            else if (result == WeaponEnhanceResult.Keep || result == WeaponEnhanceResult.ProtectedFailure)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Fail");
-            }
-            else if (result == WeaponEnhanceResult.DestroyedFailure)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Destroy");
-                selectedWeapon = null;
-                selectedWeaponIndex = -1;
-            }
-        }
-        else
-        {
-            if (selectedGem == null || selectedGemIndex < 0) return;
-
-            GemItemData nextGem = selectedGem.nextLevelGem;
-            GemEnhanceResult result = BlacksmithManager.Instance.EnhanceGemAtIndex(selectedGemIndex);
-
-            if (result == GemEnhanceResult.NotEnoughCurrency)
-            {
-                UI_ToastPopup.Show("Notice_No_Currency");
-                return;
-            }
-            else if (result == GemEnhanceResult.Success)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Success");
-                int newIndex = BlacksmithManager.Instance.ownedGems.IndexOf(nextGem);
-                selectedGemIndex = newIndex;
-                selectedGem = (newIndex >= 0) ? nextGem : null;
-            }
-            else if (result == GemEnhanceResult.Keep)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Fail");
-            }
-            else if (result == GemEnhanceResult.Destroyed)
-            {
-                UI_ToastPopup.Show("Notice_Enhance_Destroy");
-                selectedGem = null;
-                selectedGemIndex = -1;
-            }
         }
     }
 

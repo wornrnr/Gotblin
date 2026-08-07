@@ -185,31 +185,41 @@ public class BlacksmithManager : MonoBehaviour
     public WeaponEnhanceResult EnhanceWeapon(WeaponItemData weapon, bool useProtectionItem)
     {
         int idx = ownedWeapons.IndexOf(weapon);
-        if (idx >= 0) return EnhanceWeaponAtIndex(idx, useProtectionItem);
+        if (idx >= 0) 
+        {
+            if (TryConsumeWeaponEnhanceCost(idx))
+            {
+                return ExecuteWeaponEnhance(idx, useProtectionItem);
+            }
+            return WeaponEnhanceResult.NotEnoughCurrency;
+        }
         return WeaponEnhanceResult.Keep;
     }
 
-    public WeaponEnhanceResult EnhanceWeaponAtIndex(int index, bool useProtectionItem)
+    public bool TryConsumeWeaponEnhanceCost(int index)
+    {
+        if (index < 0 || index >= ownedWeapons.Count) return false;
+        WeaponItemData weapon = ownedWeapons[index];
+        if (weapon == null) return false;
+
+        if (CurrencyManager.Instance != null && CurrencyManager.Instance.Gold < weapon.enhanceCost)
+            return false;
+            
+        if (ironIngotCount < weapon.requiredIronIngot)
+            return false;
+
+        if (CurrencyManager.Instance != null) CurrencyManager.Instance.ConsumeGold(weapon.enhanceCost);
+        ironIngotCount -= weapon.requiredIronIngot;
+        
+        OnInventoryUpdated?.Invoke(); 
+        return true;
+    }
+
+    public WeaponEnhanceResult ExecuteWeaponEnhance(int index, bool useProtectionItem)
     {
         if (index < 0 || index >= ownedWeapons.Count) return WeaponEnhanceResult.Keep;
         WeaponItemData weapon = ownedWeapons[index];
         if (weapon == null) return WeaponEnhanceResult.Keep;
-
-        if (CurrencyManager.Instance != null)
-        {
-            if (!CurrencyManager.Instance.ConsumeGold(weapon.enhanceCost))
-            {
-                return WeaponEnhanceResult.NotEnoughCurrency;
-            }
-        }
-
-        if (ironIngotCount < weapon.requiredIronIngot)
-        {
-            Debug.LogWarning($"[BlacksmithManager] 철 주괴가 부족합니다! (필요: {weapon.requiredIronIngot}, 현재: {ironIngotCount})");
-            return WeaponEnhanceResult.NotEnoughCurrency;
-        }
-
-        ironIngotCount -= weapon.requiredIronIngot;
 
         int totalWeight = weapon.TotalWeight;
         int rnd = UnityEngine.Random.Range(0, totalWeight);
@@ -263,23 +273,36 @@ public class BlacksmithManager : MonoBehaviour
     public GemEnhanceResult EnhanceGem(GemItemData gem)
     {
         int idx = ownedGems.IndexOf(gem);
-        if (idx >= 0) return EnhanceGemAtIndex(idx);
+        if (idx >= 0) 
+        {
+            if (TryConsumeGemEnhanceCost(idx))
+            {
+                return ExecuteGemEnhance(idx);
+            }
+            return GemEnhanceResult.NotEnoughCurrency;
+        }
         return GemEnhanceResult.Keep;
     }
 
-    public GemEnhanceResult EnhanceGemAtIndex(int index)
+    public bool TryConsumeGemEnhanceCost(int index)
+    {
+        if (index < 0 || index >= ownedGems.Count) return false;
+        GemItemData gem = ownedGems[index];
+        if (gem == null) return false;
+
+        if (CurrencyManager.Instance != null && CurrencyManager.Instance.Gold < gem.enhanceCost)
+            return false;
+
+        if (CurrencyManager.Instance != null) CurrencyManager.Instance.ConsumeGold(gem.enhanceCost);
+        OnInventoryUpdated?.Invoke(); 
+        return true;
+    }
+
+    public GemEnhanceResult ExecuteGemEnhance(int index)
     {
         if (index < 0 || index >= ownedGems.Count) return GemEnhanceResult.Keep;
         GemItemData gem = ownedGems[index];
         if (gem == null) return GemEnhanceResult.Keep;
-
-        if (CurrencyManager.Instance != null)
-        {
-            if (!CurrencyManager.Instance.ConsumeGold(gem.enhanceCost))
-            {
-                return GemEnhanceResult.NotEnoughCurrency;
-            }
-        }
 
         int totalWeight = gem.TotalWeight;
         int rnd = UnityEngine.Random.Range(0, totalWeight);
