@@ -45,13 +45,15 @@ public class UI_BlacksmithPanel : UI_BasePopup
     [SerializeField] private UI_BlacksmithSlot slotPrefab;
     [SerializeField] private TextMeshProUGUI emptyNoticeText;
 
-    [Header("Lower Action Buttons (Sell & Forge)")]
+    [Header("Lower Action Buttons (Sell, Forge & Equip)")]
     [SerializeField] private Button sellBtn;
     [SerializeField] private TextMeshProUGUI sellBtnLabelText;
     [SerializeField] private TextMeshProUGUI sellGoldText;
     [SerializeField] private Button forgeBtn;
     [SerializeField] private TextMeshProUGUI forgeBtnLabelText;
     [SerializeField] private TextMeshProUGUI forgeGoldText;
+    [SerializeField] private Button equipBtn;
+    [SerializeField] private TextMeshProUGUI equipBtnLabelText;
 
     [Header("Bottom Navigation Tabs (Tab 1: Weapon / Tab 2: Gem)")]
     [SerializeField] private Button tab1Btn; // 무기 탭
@@ -82,10 +84,13 @@ public class UI_BlacksmithPanel : UI_BasePopup
         BlacksmithManager.OnInventoryUpdated += RefreshAllUI;
         BlacksmithManager.OnEquippedWeaponChanged += RefreshAllUI;
 
+        EnsureEquipButton();
+
         if (tab1Btn != null) tab1Btn.onClick.AddListener(SwitchToWeaponTab);
         if (tab2Btn != null) tab2Btn.onClick.AddListener(SwitchToGemTab);
         if (forgeBtn != null) forgeBtn.onClick.AddListener(OnClickForge);
         if (sellBtn != null) sellBtn.onClick.AddListener(OnClickSell);
+        if (equipBtn != null) equipBtn.onClick.AddListener(OnClickEquip);
 
         if (cheatAllWeaponsBtn != null) cheatAllWeaponsBtn.onClick.AddListener(OnCheatAllWeaponsClicked);
         if (cheatAllGemsBtn != null) cheatAllGemsBtn.onClick.AddListener(OnCheatAllGemsClicked);
@@ -281,6 +286,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (tab2Btn != null) tab2Btn.onClick.RemoveListener(SwitchToGemTab);
         if (forgeBtn != null) forgeBtn.onClick.RemoveListener(OnClickForge);
         if (sellBtn != null) sellBtn.onClick.RemoveListener(OnClickSell);
+        if (equipBtn != null) equipBtn.onClick.RemoveListener(OnClickEquip);
 
         if (cheatAllWeaponsBtn != null) cheatAllWeaponsBtn.onClick.RemoveListener(OnCheatAllWeaponsClicked);
         if (cheatAllGemsBtn != null) cheatAllGemsBtn.onClick.RemoveListener(OnCheatAllGemsClicked);
@@ -625,14 +631,82 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
     }
 
+    private void EnsureEquipButton()
+    {
+        if (equipBtn == null && forgeBtn != null)
+        {
+            Transform parentPanel = forgeBtn.transform.parent;
+            if (parentPanel != null)
+            {
+                Transform existing = parentPanel.Find("EquipButton");
+                if (existing != null)
+                {
+                    equipBtn = existing.GetComponent<Button>();
+                    equipBtnLabelText = existing.GetComponentInChildren<TextMeshProUGUI>();
+                }
+                else
+                {
+                    GameObject equipGO = Instantiate(forgeBtn.gameObject, parentPanel);
+                    equipGO.name = "EquipButton";
+                    equipBtn = equipGO.GetComponent<Button>();
+                    equipBtnLabelText = equipGO.GetComponentInChildren<TextMeshProUGUI>();
+
+                    Transform costBadge = equipGO.transform.Find("GoldBadge");
+                    if (costBadge != null) costBadge.gameObject.SetActive(false);
+
+                    Transform labelTr = equipGO.transform.Find("LabelText");
+                    if (labelTr != null) equipBtnLabelText = labelTr.GetComponent<TextMeshProUGUI>();
+                }
+            }
+        }
+    }
+
     private bool isEnhancing = false;
 
     private void UpdateActionButtonsState()
     {
         bool hasSelection = isWeaponTab ? (selectedWeapon != null) : (selectedGem != null);
         bool canInteract = hasSelection && !isEnhancing;
-        if (forgeBtn != null) forgeBtn.interactable = canInteract;
-        if (sellBtn != null) sellBtn.interactable = canInteract;
+
+        if (isWeaponTab)
+        {
+            if (forgeBtn != null)
+            {
+                forgeBtn.gameObject.SetActive(true);
+                forgeBtn.interactable = canInteract;
+            }
+
+            bool isAlreadyEquipped = (BlacksmithManager.Instance != null && selectedWeapon != null && BlacksmithManager.Instance.equippedWeapon == selectedWeapon);
+
+            if (equipBtn != null)
+            {
+                equipBtn.gameObject.SetActive(true);
+                equipBtn.interactable = canInteract && !isAlreadyEquipped;
+
+                if (equipBtnLabelText != null)
+                {
+                    equipBtnLabelText.text = isAlreadyEquipped ? "장착중" : "장착";
+                }
+            }
+
+            if (sellBtn != null)
+            {
+                sellBtn.gameObject.SetActive(true);
+                sellBtn.interactable = canInteract;
+            }
+        }
+        else
+        {
+            // Tab 2 (보석 탭): 강화 버튼 및 장착 버튼 숨김 처리
+            if (forgeBtn != null) forgeBtn.gameObject.SetActive(false);
+            if (equipBtn != null) equipBtn.gameObject.SetActive(false);
+
+            if (sellBtn != null)
+            {
+                sellBtn.gameObject.SetActive(true);
+                sellBtn.interactable = canInteract;
+            }
+        }
     }
 
     #region Tab & Action Handlers
@@ -657,6 +731,22 @@ public class UI_BlacksmithPanel : UI_BasePopup
         if (tab1Highlight != null) tab1Highlight.gameObject.SetActive(false);
         if (tab2Highlight != null) tab2Highlight.gameObject.SetActive(true);
         RefreshAllUI();
+    }
+
+    private void OnClickEquip()
+    {
+        if (isEnhancing) return;
+
+        if (isWeaponTab && selectedWeapon != null)
+        {
+            if (BlacksmithManager.Instance != null)
+            {
+                BlacksmithManager.Instance.EquipWeapon(selectedWeapon);
+                UI_ToastPopup.Show($"{selectedWeapon.weaponName} 장착 완료!");
+                Debug.Log($"<color=green>[UI_BlacksmithPanel] 무기 장착 완료: {selectedWeapon.weaponName}</color>");
+                RefreshAllUI();
+            }
+        }
     }
     private void OnClickForge()
     {
