@@ -740,21 +740,35 @@ public class BaseCombatUnit : MonoBehaviour
     {
         if (isEnemy) return;
 
-        // 1. weaponVisual 컴포넌트 자동 획득/생성 보장
+        // 1. 기존 구현된 WeaponVisual 컴포넌트 활용 보장
         if (weaponVisual == null)
         {
-            Transform wTrans = transform.Find("weapon_visual");
-            if (wTrans == null)
+            if (visualController != null && visualController.weaponVisual != null)
             {
-                GameObject go = new GameObject("weapon_visual", typeof(RectTransform), typeof(UnityEngine.UI.Image));
-                go.transform.SetParent(transform, false);
-                wTrans = go.transform;
-
-                RectTransform rect = go.GetComponent<RectTransform>();
-                rect.anchoredPosition = new Vector2(40f, 0f); // 손 우측 배치 오프셋
-                rect.sizeDelta = new Vector2(50f, 50f);
+                weaponVisual = visualController.weaponVisual.GetComponent<UnityEngine.UI.Image>();
             }
-            weaponVisual = wTrans.GetComponent<UnityEngine.UI.Image>();
+            else
+            {
+                Transform wTrans = transform.Find("WeaponVisual");
+                if (wTrans == null) wTrans = transform.Find("Visual/WeaponVisual");
+                
+                if (wTrans != null)
+                {
+                    weaponVisual = wTrans.GetComponent<UnityEngine.UI.Image>();
+                }
+                else
+                {
+                    // Fallback
+                    GameObject go = new GameObject("WeaponVisual", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+                    go.transform.SetParent(transform, false);
+                    wTrans = go.transform;
+
+                    RectTransform rect = go.GetComponent<RectTransform>();
+                    rect.anchoredPosition = new Vector2(40f, 0f);
+                    rect.sizeDelta = new Vector2(50f, 50f);
+                    weaponVisual = wTrans.GetComponent<UnityEngine.UI.Image>();
+                }
+            }
         }
 
         // 2. BlacksmithManager를 통해 장착 무기 및 스탯 연산

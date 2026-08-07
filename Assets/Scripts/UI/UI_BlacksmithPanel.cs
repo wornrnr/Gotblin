@@ -84,8 +84,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
         BlacksmithManager.OnInventoryUpdated += RefreshAllUI;
         BlacksmithManager.OnEquippedWeaponChanged += RefreshAllUI;
 
-        EnsureEquipButton();
-
         if (tab1Btn != null) tab1Btn.onClick.AddListener(SwitchToWeaponTab);
         if (tab2Btn != null) tab2Btn.onClick.AddListener(SwitchToGemTab);
         if (forgeBtn != null) forgeBtn.onClick.AddListener(OnClickForge);
@@ -360,9 +358,7 @@ public class UI_BlacksmithPanel : UI_BasePopup
             BuildGemGrid();
         }
 
-        bool hasSelection = isWeaponTab ? (selectedWeapon != null) : (selectedGem != null);
-        if (forgeBtn != null) forgeBtn.interactable = hasSelection;
-        if (sellBtn != null) sellBtn.interactable = hasSelection;
+        UpdateActionButtonsState();
     }
 
     /// <summary>
@@ -631,36 +627,6 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
     }
 
-    private void EnsureEquipButton()
-    {
-        if (equipBtn == null && forgeBtn != null)
-        {
-            Transform parentPanel = forgeBtn.transform.parent;
-            if (parentPanel != null)
-            {
-                Transform existing = parentPanel.Find("EquipButton");
-                if (existing != null)
-                {
-                    equipBtn = existing.GetComponent<Button>();
-                    equipBtnLabelText = existing.GetComponentInChildren<TextMeshProUGUI>();
-                }
-                else
-                {
-                    GameObject equipGO = Instantiate(forgeBtn.gameObject, parentPanel);
-                    equipGO.name = "EquipButton";
-                    equipBtn = equipGO.GetComponent<Button>();
-                    equipBtnLabelText = equipGO.GetComponentInChildren<TextMeshProUGUI>();
-
-                    Transform costBadge = equipGO.transform.Find("GoldBadge");
-                    if (costBadge != null) costBadge.gameObject.SetActive(false);
-
-                    Transform labelTr = equipGO.transform.Find("LabelText");
-                    if (labelTr != null) equipBtnLabelText = labelTr.GetComponent<TextMeshProUGUI>();
-                }
-            }
-        }
-    }
-
     private bool isEnhancing = false;
 
     private void UpdateActionButtonsState()
@@ -697,8 +663,12 @@ public class UI_BlacksmithPanel : UI_BasePopup
         }
         else
         {
-            // Tab 2 (보석 탭): 강화 버튼 및 장착 버튼 숨김 처리
-            if (forgeBtn != null) forgeBtn.gameObject.SetActive(false);
+            // Tab 2 (보석 탭): 장착 버튼만 숨김 처리 (보석도 강화가 가능하므로 강화 버튼은 유지)
+            if (forgeBtn != null)
+            {
+                forgeBtn.gameObject.SetActive(true);
+                forgeBtn.interactable = canInteract;
+            }
             if (equipBtn != null) equipBtn.gameObject.SetActive(false);
 
             if (sellBtn != null)
