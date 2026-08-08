@@ -524,7 +524,7 @@ public class BaseCombatUnit : MonoBehaviour
         for (int i = 0; i < targets.Count; i++)
         {
             var target = targets[i];
-            if (target != null && !target.IsDead())
+            if (target != null && target.gameObject.activeInHierarchy && !target.IsDead())
             {
                 Debug.Log($"<color=cyan><b>[CombatUnit]</b></color> <color=yellow>{gameObject.name}</color>이(가) 타겟 <color=red>{target.gameObject.name}</color>에게 동시 타격! (피해량: {damage})");
                 target.TakeDamage(damage, transform.position);
@@ -539,7 +539,7 @@ public class BaseCombatUnit : MonoBehaviour
     /// <param name="attackerPosition">나를 가격한 상대방의 위치 좌표</param>
     public void TakeDamage(int amount, Vector3 attackerPosition)
     {
-        if (currentState == UnitState.Dead) return;
+        if (currentState == UnitState.Dead || !gameObject.activeInHierarchy) return;
 
         if (isDecorationMode)
         {
