@@ -16,12 +16,13 @@ MonoBehaviour:
   weaponName: "\uC804\uD22C\uB3C4\uB07C"
   weaponType: "\uC804\uD22C\uB3C4\uB07C"
   grade: 2
-  visualSprite: {fileID: 21300000, guid: 11111111111111111111111111111112, type: 3}
-  iconSprite: {fileID: 21300000, guid: 11111111111111111111111111111112, type: 3}
+  visualSprite: {fileID: 2955288072696980448, guid: 5b2aab00f97197e4a84b525bb00d6704, type: 3}
+  iconSprite: {fileID: 2955288072696980448, guid: 5b2aab00f97197e4a84b525bb00d6704, type: 3}
   baseATK: 120
+  sellPrice: 1000
+  enhanceCost: 3000
   successWeight: 3
   keepWeight: 1
   destroyWeight: 1
   requiredIronIngot: 25
   nextGradeWeapon: {fileID: 11400000, guid: 9ffe93ab84452604581e26305b78738d, type: 2}
-
